@@ -52,14 +52,17 @@ const App: React.FC = () => {
   }, [handleResetLayout]);
 
   const handleGenerateBackground = async (prompt: string) => {
+    // Access the API Key from the environment variable provided by Render.com
     if (!process.env.API_KEY) {
-      alert("API Key is missing/invalid.");
+      alert("API Key is missing. Please configure the API_KEY environment variable in your Render.com dashboard.");
       return;
     }
     
     setIsGenerating(true);
     try {
+      // Initialize the Gemini client with the environment variable
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
@@ -99,7 +102,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Background generation error:", error);
-      alert("Failed to generate background. Please try again.");
+      alert("Failed to generate background. Please check your API usage or try again.");
     } finally {
       setIsGenerating(false);
     }
