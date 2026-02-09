@@ -62,7 +62,8 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
   // Render a Draggable Signature Block
   const renderSignatureBlock = (
     label: string, 
-    positionKey: 'brideSigPos' | 'groomSigPos' | 'counselorSigPos'
+    positionKey: 'brideSigPos' | 'groomSigPos' | 'counselorSigPos',
+    name?: string
   ) => {
     const pos = layout[positionKey];
     
@@ -83,6 +84,11 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
           <p className="text-sm font-bold uppercase tracking-widest select-none" style={{ fontFamily: 'Cinzel, serif' }}>
             {label}
           </p>
+          {name && (
+            <p className="text-sm font-serif italic mt-[-4px] opacity-90">
+              {name}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -182,9 +188,9 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
           <div className="absolute inset-0 pointer-events-none">
              {/* We re-enable pointer events on the items themselves */}
              <div className="w-full h-full relative pointer-events-auto">
-                {renderSignatureBlock('Signature of Bride-to-Be', 'brideSigPos')}
-                {renderSignatureBlock('Pre-Marital Counselor', 'counselorSigPos')}
-                {renderSignatureBlock('Signature of Groom-to-Be', 'groomSigPos')}
+                {renderSignatureBlock('Signature of Bride-to-Be', 'brideSigPos', data.brideName)}
+                {renderSignatureBlock('Pre-Marital Counselor', 'counselorSigPos', data.counselorName)}
+                {renderSignatureBlock('Signature of Groom-to-Be', 'groomSigPos', data.groomName)}
              </div>
           </div>
 

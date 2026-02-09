@@ -9,6 +9,7 @@ const App: React.FC = () => {
   const [data, setData] = useState<CertificateData>({
     brideName: '',
     groomName: '',
+    counselorName: '',
     date: '',
     slogan: '"Let no one split apart what God has joined together."',
   });
@@ -49,6 +50,7 @@ const App: React.FC = () => {
       setData({ 
         brideName: '', 
         groomName: '', 
+        counselorName: '',
         date: '',
         slogan: '"Let no one split apart what God has joined together."'
       });

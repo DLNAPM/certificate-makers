@@ -114,6 +114,19 @@ const Controls: React.FC<ControlsProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
+              Counselor's Name
+            </label>
+            <input
+              type="text"
+              value={data.counselorName}
+              onChange={(e) => onDataChange('counselorName', e.target.value)}
+              placeholder="e.g. Rev. Michael Smith"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Date
             </label>
             <input

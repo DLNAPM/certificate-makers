@@ -1,6 +1,7 @@
 export interface CertificateData {
   brideName: string;
   groomName: string;
+  counselorName: string;
   date: string;
   slogan: string;
 }
