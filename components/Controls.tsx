@@ -124,6 +124,18 @@ const Controls: React.FC<ControlsProps> = ({
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Slogan / Bible Verse
+            </label>
+            <textarea
+              value={data.slogan}
+              onChange={(e) => onDataChange('slogan', e.target.value)}
+              placeholder="Enter a slogan or Bible verse"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 h-24 resize-y text-sm"
+            />
+          </div>
         </div>
 
         {/* Layout Controls */}

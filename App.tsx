@@ -10,6 +10,7 @@ const App: React.FC = () => {
     brideName: '',
     groomName: '',
     date: '',
+    slogan: '"Let no one split apart what God has joined together."',
   });
 
   // Default positions optimized for the 1056x816 container
@@ -45,23 +46,33 @@ const App: React.FC = () => {
 
   const handleCreateNew = useCallback(() => {
     if (window.confirm("Are you sure you want to create a new certificate? This will clear your current progress.")) {
-      setData({ brideName: '', groomName: '', date: '' });
+      setData({ 
+        brideName: '', 
+        groomName: '', 
+        date: '',
+        slogan: '"Let no one split apart what God has joined together."'
+      });
       handleResetLayout();
       setSelectedBackground(BACKGROUNDS[0]);
     }
   }, [handleResetLayout]);
 
   const handleGenerateBackground = async (prompt: string) => {
-    // Access the API Key from the environment variable provided by Render.com
-    if (!process.env.API_KEY) {
+    // SECURITY NOTE:
+    // The API Key is accessed via process.env.API_KEY.
+    // Do not hardcode your API key here. Configure 'API_KEY' in your
+    // environment variables (e.g., .env file locally or Render/Vercel dashboard).
+    const apiKey = process.env.API_KEY;
+
+    if (!apiKey) {
+      console.error("API_KEY environment variable is missing.");
       alert("API Key is missing. Please configure the API_KEY environment variable in your Render.com dashboard.");
       return;
     }
     
     setIsGenerating(true);
     try {
-      // Initialize the Gemini client with the environment variable
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -102,7 +113,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Background generation error:", error);
-      alert("Failed to generate background. Please check your API usage or try again.");
+      alert("Failed to generate background. Please check your API key configuration and try again.");
     } finally {
       setIsGenerating(false);
     }

@@ -2,6 +2,7 @@ export interface CertificateData {
   brideName: string;
   groomName: string;
   date: string;
+  slogan: string;
 }
 
 export interface Position {

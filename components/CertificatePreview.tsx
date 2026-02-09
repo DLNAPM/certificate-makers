@@ -166,15 +166,15 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
           </div>
 
           {/* Slogan */}
-          <div className="w-full max-w-4xl mx-auto mt-12 mb-4">
+          <div className="w-full max-w-4xl mx-auto mt-12 mb-4 px-8">
             <p 
-              className="italic leading-relaxed opacity-90 transition-all duration-200" 
+              className="italic leading-relaxed opacity-90 transition-all duration-200 whitespace-pre-wrap" 
               style={{ 
                 fontFamily: 'Great Vibes, cursive',
                 fontSize: `${layout.sloganSize}px`
               }}
             >
-              "Let no one split apart what God has joined together."
+              {data.slogan}
             </p>
           </div>
 
