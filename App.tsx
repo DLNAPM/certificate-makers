@@ -60,15 +60,46 @@ const App: React.FC = () => {
   }, [handleResetLayout]);
 
   const handleGenerateBackground = async (prompt: string) => {
-    // SECURITY NOTE:
-    // The API Key is accessed via process.env.API_KEY.
-    // Do not hardcode your API key here. Configure 'API_KEY' in your
-    // environment variables (e.g., .env file locally or Render/Vercel dashboard).
-    const apiKey = process.env.API_KEY;
+    // SECURITY & CONFIGURATION NOTE:
+    // When deploying a frontend-only app (like on Render Static Sites), environment variables
+    // are injected at build time. 
+    // 1. Most bundlers (like Vite) require variables to be prefixed with 'VITE_' to be exposed.
+    // 2. In your Render Dashboard, rename 'API_KEY' to 'VITE_API_KEY'.
+    // 3. This code checks both process.env.API_KEY (Node/Standard) and import.meta.env.VITE_API_KEY (Vite).
+    
+    let apiKey = '';
+    
+    try {
+      // Check standard process.env (Node/Webpack)
+      if (process.env.API_KEY) {
+        apiKey = process.env.API_KEY;
+      }
+    } catch (e) {
+      // process might not be defined in some browser environments
+    }
+
+    if (!apiKey) {
+      try {
+        // Check Vite environment variable (requires VITE_ prefix in Render Dashboard)
+        // @ts-ignore
+        if (import.meta.env?.VITE_API_KEY) {
+           // @ts-ignore
+           apiKey = import.meta.env.VITE_API_KEY;
+        }
+      } catch (e) {
+        // import.meta might not be available
+      }
+    }
 
     if (!apiKey) {
       console.error("API_KEY environment variable is missing.");
-      alert("API Key is missing. Please configure the API_KEY environment variable in your Render.com dashboard.");
+      alert(
+        "API Key is missing.\n\n" +
+        "TROUBLESHOOTING FOR RENDER.COM:\n" +
+        "1. Go to your Render Dashboard > Environment.\n" +
+        "2. Add a new variable named 'VITE_API_KEY' with your Google Gemini API key.\n" +
+        "3. Trigger a manual deploy (Clear Cache & Deploy) to ensure the new key is baked into the build."
+      );
       return;
     }
     
