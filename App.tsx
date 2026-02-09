@@ -1,9 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import Controls from './components/Controls';
 import CertificatePreview from './components/CertificatePreview';
-import { CertificateData, BackgroundOption, CertificateLayout } from './types';
+import SaveTemplateModal from './components/SaveTemplateModal';
+import TemplateGallery from './components/TemplateGallery';
+import { CertificateData, BackgroundOption, CertificateLayout, UserProfile, SavedTemplate } from './types';
 import { BACKGROUNDS } from './constants';
+import { loginWithGoogle, logoutUser, subscribeToAuth, saveTemplate } from './services/firebase';
 
 const App: React.FC = () => {
   const [data, setData] = useState<CertificateData>({
@@ -26,6 +29,19 @@ const App: React.FC = () => {
   const [backgroundOptions, setBackgroundOptions] = useState<BackgroundOption[]>(BACKGROUNDS);
   const [selectedBackground, setSelectedBackground] = useState<BackgroundOption>(BACKGROUNDS[0]);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Auth & Template State
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleDataChange = useCallback((field: keyof CertificateData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -60,46 +76,26 @@ const App: React.FC = () => {
   }, [handleResetLayout]);
 
   const handleGenerateBackground = async (prompt: string) => {
-    // SECURITY & CONFIGURATION NOTE:
-    // When deploying a frontend-only app (like on Render Static Sites), environment variables
-    // are injected at build time. 
-    // 1. Most bundlers (like Vite) require variables to be prefixed with 'VITE_' to be exposed.
-    // 2. In your Render Dashboard, rename 'API_KEY' to 'VITE_API_KEY'.
-    // 3. This code checks both process.env.API_KEY (Node/Standard) and import.meta.env.VITE_API_KEY (Vite).
-    
     let apiKey = '';
     
     try {
-      // Check standard process.env (Node/Webpack)
       if (process.env.API_KEY) {
         apiKey = process.env.API_KEY;
       }
-    } catch (e) {
-      // process might not be defined in some browser environments
-    }
+    } catch (e) {}
 
     if (!apiKey) {
       try {
-        // Check Vite environment variable (requires VITE_ prefix in Render Dashboard)
         // @ts-ignore
         if (import.meta.env?.VITE_API_KEY) {
            // @ts-ignore
            apiKey = import.meta.env.VITE_API_KEY;
         }
-      } catch (e) {
-        // import.meta might not be available
-      }
+      } catch (e) {}
     }
 
     if (!apiKey) {
-      console.error("API_KEY environment variable is missing.");
-      alert(
-        "API Key is missing.\n\n" +
-        "TROUBLESHOOTING FOR RENDER.COM:\n" +
-        "1. Go to your Render Dashboard > Environment.\n" +
-        "2. Add a new variable named 'VITE_API_KEY' with your Google Gemini API key.\n" +
-        "3. Trigger a manual deploy (Clear Cache & Deploy) to ensure the new key is baked into the build."
-      );
+      alert("API Key is missing. Please check your Render configuration.");
       return;
     }
     
@@ -134,19 +130,18 @@ const App: React.FC = () => {
           id: `generated-${Date.now()}`,
           name: 'AI Generated',
           url: imageUrl,
-          textColor: 'text-slate-900', // Default assumption
+          textColor: 'text-slate-900',
           borderColor: 'border-slate-800',
           accentColor: 'bg-slate-800'
         };
-        // Add new background to top of list
         setBackgroundOptions(prev => [newBg, ...prev]);
         setSelectedBackground(newBg);
       } else {
-        alert("The AI could not generate an image at this time. Please try a different description.");
+        alert("The AI could not generate an image at this time.");
       }
     } catch (error) {
       console.error("Background generation error:", error);
-      alert("Failed to generate background. Please check your API key configuration and try again.");
+      alert("Failed to generate background.");
     } finally {
       setIsGenerating(false);
     }
@@ -156,9 +151,61 @@ const App: React.FC = () => {
     window.print();
   }, []);
 
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (error) {
+      alert("Login failed. Please check your internet connection.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+  };
+
+  const handleSaveTemplateAction = async (name: string, isPublic: boolean) => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      await saveTemplate({
+        name,
+        data,
+        layout,
+        background: selectedBackground,
+        createdBy: user.uid,
+        creatorName: user.displayName || 'Anonymous',
+        createdAt: Date.now(),
+        isPublic
+      });
+      setShowSaveModal(false);
+      alert("Template saved successfully!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save template. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadTemplate = (template: SavedTemplate) => {
+    setData(template.data);
+    setLayout(template.layout);
+    
+    // Check if background exists in options, if not add it
+    const existingBg = backgroundOptions.find(b => b.url === template.background.url);
+    if (existingBg) {
+      setSelectedBackground(existingBg);
+    } else {
+      setBackgroundOptions(prev => [template.background, ...prev]);
+      setSelectedBackground(template.background);
+    }
+    
+    setShowGallery(false);
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
-      {/* Controls Sidebar - Hidden when printing */}
+      {/* Controls Sidebar */}
       <div className="flex-none lg:h-screen lg:sticky lg:top-0">
         <Controls
           data={data}
@@ -173,6 +220,11 @@ const App: React.FC = () => {
           onGenerateBackground={handleGenerateBackground}
           isGenerating={isGenerating}
           onPrint={handlePrint}
+          user={user}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          onSaveTemplate={() => setShowSaveModal(true)}
+          onOpenGallery={() => setShowGallery(true)}
         />
       </div>
 
@@ -187,6 +239,23 @@ const App: React.FC = () => {
           />
         </div>
       </main>
+      
+      {/* Modals */}
+      {showSaveModal && (
+        <SaveTemplateModal
+          onSave={handleSaveTemplateAction}
+          onClose={() => setShowSaveModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+      
+      {showGallery && (
+        <TemplateGallery
+          user={user}
+          onLoadTemplate={handleLoadTemplate}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
     </div>
   );
 };

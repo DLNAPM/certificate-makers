@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { CertificateData, BackgroundOption, CertificateLayout } from '../types';
-import { Printer, PenTool, Layout, RefreshCw, FilePlus, Sparkles, Mic, MicOff } from 'lucide-react';
+import { CertificateData, BackgroundOption, CertificateLayout, UserProfile } from '../types';
+import { Printer, PenTool, Layout, RefreshCw, FilePlus, Sparkles, Mic, MicOff, Save, Download, LogIn, LogOut, User as UserIcon } from 'lucide-react';
 
 interface ControlsProps {
   data: CertificateData;
@@ -15,6 +15,13 @@ interface ControlsProps {
   onGenerateBackground: (prompt: string) => void;
   isGenerating: boolean;
   onPrint: () => void;
+  
+  // Auth & Cloud Props
+  user: UserProfile | null;
+  onLogin: () => void;
+  onLogout: () => void;
+  onSaveTemplate: () => void;
+  onOpenGallery: () => void;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -30,12 +37,17 @@ const Controls: React.FC<ControlsProps> = ({
   onGenerateBackground,
   isGenerating,
   onPrint,
+  user,
+  onLogin,
+  onLogout,
+  onSaveTemplate,
+  onOpenGallery
 }) => {
   const [prompt, setPrompt] = useState('');
   const [isListening, setIsListening] = useState(false);
 
   const handleDictate = () => {
-    // @ts-ignore - SpeechRecognition types are not globally available by default
+    // @ts-ignore
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (SpeechRecognition) {
@@ -63,21 +75,72 @@ const Controls: React.FC<ControlsProps> = ({
     <div className="w-full lg:w-96 bg-white border-r border-slate-200 h-screen overflow-y-auto flex flex-col shadow-lg no-print z-50">
       
       {/* Header */}
-      <div className="p-6 bg-slate-900 text-white flex justify-between items-start">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <PenTool size={20} />
-            Certificate Maker
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">Customize your covenant document</p>
+      <div className="p-6 bg-slate-900 text-white">
+        <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <PenTool size={20} />
+                Certificate Maker
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">Customize your covenant</p>
+            </div>
+             <button 
+                onClick={onCreateNew}
+                className="bg-slate-700 hover:bg-slate-600 p-2 rounded text-white transition-colors"
+                title="Create New (Reset)"
+              >
+                <FilePlus size={18} />
+              </button>
         </div>
-        <button 
-          onClick={onCreateNew}
-          className="bg-slate-700 hover:bg-slate-600 p-2 rounded text-white transition-colors"
-          title="Create New (Reset)"
-        >
-          <FilePlus size={18} />
-        </button>
+
+        {/* User / Auth Bar */}
+        <div className="flex gap-2">
+            {user ? (
+                <div className="flex-1 flex items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
+                    {user.photoURL ? (
+                        <img src={user.photoURL} className="w-8 h-8 rounded-full border border-slate-600" alt="Avatar"/>
+                    ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center">
+                            <UserIcon size={14}/>
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-400 truncate">Signed in as</p>
+                        <p className="text-sm font-medium truncate">{user.displayName || 'User'}</p>
+                    </div>
+                    <button onClick={onLogout} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white" title="Logout">
+                        <LogOut size={16} />
+                    </button>
+                </div>
+            ) : (
+                <button 
+                    onClick={onLogin}
+                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                    <LogIn size={16} /> Sign in with Google
+                </button>
+            )}
+        </div>
+        
+        {/* Template Actions */}
+        <div className="flex gap-2 mt-3">
+             <button 
+                onClick={onOpenGallery}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
+            >
+                <Download size={14} /> Browse Templates
+            </button>
+             <button 
+                onClick={onSaveTemplate}
+                disabled={!user}
+                className={`flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-700 transition-colors ${
+                  user ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-800/50 text-slate-500 cursor-not-allowed'
+                }`}
+                title={!user ? "Sign in to save templates" : "Save current design"}
+            >
+                <Save size={14} /> Save Design
+            </button>
+        </div>
       </div>
 
       <div className="p-6 space-y-8 flex-1">

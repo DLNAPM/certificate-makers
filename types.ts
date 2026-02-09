@@ -27,3 +27,22 @@ export interface BackgroundOption {
   borderColor: string;
   accentColor: string; // For lines/dividers
 }
+
+export interface UserProfile {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
+
+export interface SavedTemplate {
+  id?: string;
+  name: string;
+  data: CertificateData;
+  layout: CertificateLayout;
+  background: BackgroundOption;
+  createdBy: string; // uid
+  creatorName: string;
+  createdAt: number;
+  isPublic: boolean;
+}
