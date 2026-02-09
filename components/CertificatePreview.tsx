@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CertificateData, BackgroundOption, CertificateLayout, Position } from '../types';
 
 interface CertificatePreviewProps {
@@ -69,7 +69,7 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
     return (
       <div 
         className="absolute cursor-move group"
-        style={{ left: pos.x, top: pos.y, width: '200px' }}
+        style={{ left: pos.x, top: pos.y, width: `${layout.signatureWidth}px` }}
         onMouseDown={(e) => handleMouseDown(e, positionKey)}
       >
         <div className={`

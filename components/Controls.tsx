@@ -91,7 +91,7 @@ const Controls: React.FC<ControlsProps> = ({
             <button 
               onClick={onResetLayout}
               className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1"
-              title="Reset slogan size and signature positions"
+              title="Reset layout settings"
             >
               <RefreshCw size={12} /> Reset
             </button>
@@ -110,6 +110,21 @@ const Controls: React.FC<ControlsProps> = ({
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
             />
           </div>
+
+          <div>
+             <label className="block text-sm font-medium text-slate-700 mb-2">
+              Signature Width: {layout.signatureWidth}px
+            </label>
+            <input 
+              type="range" 
+              min="150" 
+              max="400" 
+              value={layout.signatureWidth}
+              onChange={(e) => onLayoutChange('signatureWidth', parseInt(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+            />
+          </div>
+
           <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded">
             <strong>Hint:</strong> You can drag and drop the signature lines on the preview to reposition them.
           </div>

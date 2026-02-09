@@ -11,6 +11,7 @@ export interface Position {
 
 export interface CertificateLayout {
   sloganSize: number;
+  signatureWidth: number;
   brideSigPos: Position;
   groomSigPos: Position;
   counselorSigPos: Position;

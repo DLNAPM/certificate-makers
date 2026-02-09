@@ -27,6 +27,14 @@ export const BACKGROUNDS: BackgroundOption[] = [
     accentColor: 'bg-slate-800',
   },
   {
+    id: 'rose-on-bible',
+    name: 'Rose on Bible',
+    url: 'https://images.unsplash.com/photo-1510304982635-08101480f2d4?q=80&w=2000&auto=format&fit=crop',
+    textColor: 'text-white',
+    borderColor: 'border-rose-100',
+    accentColor: 'bg-rose-100',
+  },
+  {
     id: 'clouds',
     name: 'Heavenly Clouds',
     url: 'https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?q=80&w=2000&auto=format&fit=crop',

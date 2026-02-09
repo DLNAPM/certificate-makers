@@ -14,6 +14,7 @@ const App: React.FC = () => {
   // Default positions optimized for the 1056x816 container
   const [layout, setLayout] = useState<CertificateLayout>({
     sloganSize: 48, // approx text-5xl
+    signatureWidth: 250,
     brideSigPos: { x: 100, y: 650 },
     groomSigPos: { x: 750, y: 650 },
     counselorSigPos: { x: 428, y: 650 },
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const handleResetLayout = useCallback(() => {
      setLayout({
       sloganSize: 48,
+      signatureWidth: 250,
       brideSigPos: { x: 100, y: 650 },
       groomSigPos: { x: 750, y: 650 },
       counselorSigPos: { x: 428, y: 650 },
