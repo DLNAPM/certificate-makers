@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, Search, User, Globe, Loader2, Download } from 'lucide-react';
+import { X, Search, User, Globe, Loader2, Download, Trash2 } from 'lucide-react';
 import { SavedTemplate, UserProfile } from '../types';
-import { fetchTemplates } from '../services/firebase';
+import { fetchTemplates, deleteTemplate } from '../services/firebase';
 
 interface TemplateGalleryProps {
   user: UserProfile | null;
@@ -35,6 +35,25 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
       setError("Could not load templates. Make sure Firebase is configured.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, template: SavedTemplate) => {
+    e.stopPropagation(); // Prevent loading the template
+    
+    if (!window.confirm(`Are you sure you want to delete "${template.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      if (template.id) {
+        await deleteTemplate(template.id, template.background.url);
+        // Remove from local state
+        setTemplates(prev => prev.filter(t => t.id !== template.id));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete template. You might not have permission.");
     }
   };
 
@@ -98,37 +117,59 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {templates.map((template) => (
-                <div 
-                  key={template.id} 
-                  className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all group border border-slate-200 flex flex-col"
-                >
-                  <div className="relative h-48 bg-slate-200 overflow-hidden">
-                    <img 
-                      src={template.background.url} 
-                      alt={template.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                       <button
-                         onClick={() => onLoadTemplate(template)}
-                         className="w-full bg-white text-slate-900 py-2 rounded font-semibold flex items-center justify-center gap-2 shadow-lg"
-                       >
-                         <Download size={16} /> Load Design
-                       </button>
+              {templates.map((template) => {
+                const isOwner = user?.uid === template.createdBy;
+                return (
+                  <div 
+                    key={template.id} 
+                    className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all group border border-slate-200 flex flex-col"
+                  >
+                    <div className="relative h-48 bg-slate-200 overflow-hidden">
+                      <img 
+                        src={template.background.url} 
+                        alt={template.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      
+                      {/* Delete Button - Only visible if owner */}
+                      {isOwner && (
+                        <button
+                          onClick={(e) => handleDelete(e, template)}
+                          className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition-all shadow-lg z-20 opacity-0 group-hover:opacity-100 transform translate-y-[-10px] group-hover:translate-y-0"
+                          title="Delete Template"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 z-10">
+                         <button
+                           onClick={() => onLoadTemplate(template)}
+                           className="w-full bg-white text-slate-900 py-2 rounded font-semibold flex items-center justify-center gap-2 shadow-lg hover:bg-slate-100"
+                         >
+                           <Download size={16} /> Load Design
+                         </button>
+                      </div>
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-slate-800 truncate flex-1 pr-2">{template.name}</h3>
+                        {isOwner && (
+                           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                             YOU
+                           </span>
+                        )}
+                      </div>
+                      <div className="mt-auto pt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+                        <span className="flex items-center gap-1">
+                          <User size={12} /> {template.creatorName}
+                        </span>
+                        <span>{new Date(template.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4 flex-1 flex flex-col">
-                    <h3 className="font-bold text-slate-800 truncate">{template.name}</h3>
-                    <div className="mt-auto pt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-                      <span className="flex items-center gap-1">
-                        <User size={12} /> {template.creatorName}
-                      </span>
-                      <span>{new Date(template.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

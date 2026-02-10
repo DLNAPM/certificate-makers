@@ -14,13 +14,16 @@ import {
   where, 
   getDocs,
   orderBy,
-  limit 
+  limit,
+  deleteDoc,
+  doc
 } from "firebase/firestore";
 import { 
   getStorage, 
   ref, 
   uploadString, 
-  getDownloadURL 
+  getDownloadURL,
+  deleteObject
 } from "firebase/storage";
 import { SavedTemplate, UserProfile } from "../types";
 
@@ -128,6 +131,29 @@ export const saveTemplate = async (template: Omit<SavedTemplate, 'id'>) => {
 
   const docRef = await addDoc(collection(db, "templates"), cleanTemplate);
   return docRef.id;
+};
+
+export const deleteTemplate = async (templateId: string, backgroundUrl?: string) => {
+  if (!db) throw new Error("Firebase DB not configured");
+
+  try {
+    // 1. Delete from Firestore
+    await deleteDoc(doc(db, "templates", templateId));
+
+    // 2. Delete from Storage if it's a firebase storage url
+    if (backgroundUrl && backgroundUrl.includes("firebasestorage.googleapis.com")) {
+      try {
+        const imageRef = ref(storage, backgroundUrl);
+        await deleteObject(imageRef);
+      } catch (storageError) {
+        console.warn("Could not delete associated image from storage", storageError);
+        // Continue, as the template record is already gone
+      }
+    }
+  } catch (error) {
+    console.error("Error deleting template:", error);
+    throw error;
+  }
 };
 
 export const fetchTemplates = async (isPublic: boolean = true, userId?: string) => {
