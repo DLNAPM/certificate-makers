@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
-import { X, Save, Share2, Lock } from 'lucide-react';
+import { X, Save, Share2, Lock, Users } from 'lucide-react';
 
 interface SaveTemplateModalProps {
-  onSave: (name: string, isPublic: boolean) => Promise<void>;
+  onSave: (name: string, isPublic: boolean, sharedWith: string[]) => Promise<void>;
   onClose: () => void;
   isSaving: boolean;
 }
 
 const SaveTemplateModal: React.FC<SaveTemplateModalProps> = ({ onSave, onClose, isSaving }) => {
   const [name, setName] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
+  const [sharingMode, setSharingMode] = useState<'public' | 'private' | 'shared'>('public');
+  const [emailInput, setEmailInput] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSave(name, isPublic);
+      const sharedWith = sharingMode === 'shared' 
+        ? emailInput.split(',').map(e => e.trim()).filter(e => e.length > 0)
+        : [];
+      
+      onSave(name, sharingMode === 'public', sharedWith);
     }
   };
 
@@ -44,27 +49,57 @@ const SaveTemplateModal: React.FC<SaveTemplateModalProps> = ({ onSave, onClose, 
           </div>
 
           <div className="bg-slate-50 p-4 rounded-lg space-y-3">
-             <label className="flex items-center gap-3 cursor-pointer">
+             <label className="flex items-start gap-3 cursor-pointer">
                <input 
                  type="radio" 
-                 checked={isPublic} 
-                 onChange={() => setIsPublic(true)}
-                 className="w-4 h-4 text-indigo-600"
+                 name="sharing"
+                 checked={sharingMode === 'public'} 
+                 onChange={() => setSharingMode('public')}
+                 className="mt-1 w-4 h-4 text-indigo-600"
                />
                <div className="flex-1">
                  <div className="flex items-center gap-2 font-medium text-slate-800">
-                   <Share2 size={16} /> Public (Shared)
+                   <Share2 size={16} /> Public (Community)
                  </div>
-                 <p className="text-xs text-slate-500">Visible to all users in the community gallery.</p>
+                 <p className="text-xs text-slate-500">Visible to all users in the gallery.</p>
                </div>
              </label>
 
-             <label className="flex items-center gap-3 cursor-pointer">
+             <label className="flex items-start gap-3 cursor-pointer">
                <input 
                  type="radio" 
-                 checked={!isPublic} 
-                 onChange={() => setIsPublic(false)}
-                 className="w-4 h-4 text-indigo-600"
+                 name="sharing"
+                 checked={sharingMode === 'shared'} 
+                 onChange={() => setSharingMode('shared')}
+                 className="mt-1 w-4 h-4 text-indigo-600"
+               />
+               <div className="flex-1">
+                 <div className="flex items-center gap-2 font-medium text-slate-800">
+                   <Users size={16} /> Specific People
+                 </div>
+                 <p className="text-xs text-slate-500">Share with specific Google accounts.</p>
+                 
+                 {sharingMode === 'shared' && (
+                    <div className="mt-2">
+                        <textarea
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="Enter email addresses separated by commas (e.g. jane@example.com, bob@gmail.com)"
+                            className="w-full text-xs p-2 border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                            rows={3}
+                        />
+                    </div>
+                 )}
+               </div>
+             </label>
+
+             <label className="flex items-start gap-3 cursor-pointer">
+               <input 
+                 type="radio" 
+                 name="sharing"
+                 checked={sharingMode === 'private'} 
+                 onChange={() => setSharingMode('private')}
+                 className="mt-1 w-4 h-4 text-indigo-600"
                />
                <div className="flex-1">
                  <div className="flex items-center gap-2 font-medium text-slate-800">

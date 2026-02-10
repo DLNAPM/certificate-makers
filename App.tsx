@@ -163,7 +163,7 @@ const App: React.FC = () => {
     await logoutUser();
   };
 
-  const handleSaveTemplateAction = async (name: string, isPublic: boolean) => {
+  const handleSaveTemplateAction = async (name: string, isPublic: boolean, sharedWith: string[]) => {
     if (!user) return;
     setIsSaving(true);
     try {
@@ -175,7 +175,8 @@ const App: React.FC = () => {
         createdBy: user.uid,
         creatorName: user.displayName || 'Anonymous',
         createdAt: Date.now(),
-        isPublic
+        isPublic,
+        sharedWith
       });
       setShowSaveModal(false);
       alert("Template saved successfully!");

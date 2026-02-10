@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, Search, User, Globe, Loader2, Download, Trash2 } from 'lucide-react';
+import { X, Search, User, Globe, Loader2, Download, Trash2, Users } from 'lucide-react';
 import { SavedTemplate, UserProfile } from '../types';
-import { fetchTemplates, deleteTemplate } from '../services/firebase';
+import { fetchTemplates, deleteTemplate, TemplateFilterType } from '../services/firebase';
 
 interface TemplateGalleryProps {
   user: UserProfile | null;
@@ -10,7 +10,7 @@ interface TemplateGalleryProps {
 }
 
 const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'community' | 'mine'>('community');
+  const [activeTab, setActiveTab] = useState<TemplateFilterType>('community');
   const [templates, setTemplates] = useState<SavedTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +23,8 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
     setLoading(true);
     setError(null);
     try {
-      if (activeTab === 'mine' && user) {
-        const data = await fetchTemplates(false, user.uid);
-        setTemplates(data);
-      } else {
-        const data = await fetchTemplates(true);
-        setTemplates(data);
-      }
+      const data = await fetchTemplates(activeTab, user || undefined);
+      setTemplates(data);
     } catch (err) {
       console.error(err);
       setError("Could not load templates. Make sure Firebase is configured.");
@@ -73,10 +68,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 px-6">
+        <div className="flex border-b border-slate-200 px-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('community')}
-            className={`py-4 px-6 font-medium flex items-center gap-2 border-b-2 transition-colors ${
+            className={`py-4 px-6 font-medium flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'community' 
                 ? 'border-indigo-600 text-indigo-600' 
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -84,17 +79,31 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
           >
             <Globe size={18} /> Community
           </button>
+          
           {user && (
-            <button
-              onClick={() => setActiveTab('mine')}
-              className={`py-4 px-6 font-medium flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === 'mine' 
-                  ? 'border-indigo-600 text-indigo-600' 
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <User size={18} /> My Templates
-            </button>
+            <>
+              <button
+                onClick={() => setActiveTab('shared')}
+                className={`py-4 px-6 font-medium flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'shared' 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Users size={18} /> Shared with Me
+              </button>
+
+              <button
+                onClick={() => setActiveTab('mine')}
+                className={`py-4 px-6 font-medium flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'mine' 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <User size={18} /> My Templates
+              </button>
+            </>
           )}
         </div>
 
@@ -113,12 +122,18 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
           ) : templates.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400">
               <Search size={48} className="mb-4 opacity-20" />
-              <p>No templates found.</p>
+              <p>
+                {activeTab === 'community' && "No community templates found."}
+                {activeTab === 'shared' && "No templates shared with you yet."}
+                {activeTab === 'mine' && "You haven't saved any templates yet."}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {templates.map((template) => {
                 const isOwner = user?.uid === template.createdBy;
+                const isShared = template.sharedWith && user?.email && template.sharedWith.includes(user.email);
+                
                 return (
                   <div 
                     key={template.id} 
@@ -142,6 +157,12 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
                         </button>
                       )}
 
+                      {isShared && !isOwner && (
+                         <div className="absolute top-2 right-2 bg-indigo-600 text-white p-1 px-2 text-[10px] rounded shadow-sm z-20 font-bold uppercase tracking-wider">
+                           Shared
+                         </div>
+                      )}
+
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 z-10">
                          <button
                            onClick={() => onLoadTemplate(template)}
@@ -155,7 +176,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ user, onLoadTemplate,
                       <div className="flex justify-between items-start">
                         <h3 className="font-bold text-slate-800 truncate flex-1 pr-2">{template.name}</h3>
                         {isOwner && (
-                           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 h-fit">
                              YOU
                            </span>
                         )}

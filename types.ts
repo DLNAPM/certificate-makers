@@ -45,4 +45,5 @@ export interface SavedTemplate {
   creatorName: string;
   createdAt: number;
   isPublic: boolean;
+  sharedWith?: string[]; // List of emails
 }

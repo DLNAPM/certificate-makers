@@ -156,23 +156,44 @@ export const deleteTemplate = async (templateId: string, backgroundUrl?: string)
   }
 };
 
-export const fetchTemplates = async (isPublic: boolean = true, userId?: string) => {
+export type TemplateFilterType = 'public' | 'mine' | 'shared';
+
+export const fetchTemplates = async (type: TemplateFilterType, user?: UserProfile) => {
   if (!db) return [];
   
   const templatesRef = collection(db, "templates");
   let q;
 
-  if (userId && !isPublic) {
-    // Fetch My Templates
-    q = query(templatesRef, where("createdBy", "==", userId), orderBy("createdAt", "desc"));
-  } else {
-    // Fetch Community Templates
-    q = query(templatesRef, where("isPublic", "==", true), orderBy("createdAt", "desc"), limit(20));
-  }
+  try {
+    if (type === 'mine' && user) {
+      // Fetch My Templates
+      q = query(templatesRef, where("createdBy", "==", user.uid), orderBy("createdAt", "desc"));
+    } else if (type === 'shared' && user && user.email) {
+      // Fetch Shared Templates
+      // Note: This requires an index on 'sharedWith' array and 'createdAt'.
+      q = query(templatesRef, where("sharedWith", "array-contains", user.email), orderBy("createdAt", "desc"));
+    } else {
+      // Fetch Community Templates (Default)
+      q = query(templatesRef, where("isPublic", "==", true), orderBy("createdAt", "desc"), limit(20));
+    }
 
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as SavedTemplate[];
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as SavedTemplate[];
+  } catch (error: any) {
+    console.error("Error fetching templates:", error);
+    // Fallback for missing index errors
+    if (error.code === 'failed-precondition') {
+      console.warn("Index missing. Returning unsorted/filtered results temporarily.");
+      // If index is missing, try a simpler query without sort
+      if (type === 'shared' && user && user.email) {
+         const simpleQ = query(templatesRef, where("sharedWith", "array-contains", user.email));
+         const snap = await getDocs(simpleQ);
+         return snap.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a,b) => b.createdAt - a.createdAt) as SavedTemplate[];
+      }
+    }
+    throw error;
+  }
 };
