@@ -4,11 +4,14 @@ import Controls from './components/Controls';
 import CertificatePreview from './components/CertificatePreview';
 import SaveTemplateModal from './components/SaveTemplateModal';
 import TemplateGallery from './components/TemplateGallery';
+import LandingPage from './components/LandingPage';
 import { CertificateData, BackgroundOption, CertificateLayout, UserProfile, SavedTemplate } from './types';
 import { BACKGROUNDS } from './constants';
 import { loginWithGoogle, logoutUser, subscribeToAuth, saveTemplate } from './services/firebase';
 
 const App: React.FC = () => {
+  const [showLanding, setShowLanding] = useState(true);
+  
   const [data, setData] = useState<CertificateData>({
     brideName: '',
     groomName: '',
@@ -202,10 +205,15 @@ const App: React.FC = () => {
     }
     
     setShowGallery(false);
+    setShowLanding(false); // Ensure we are in the editor view
   };
 
+  if (showLanding) {
+    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+  }
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen animate-in fade-in duration-500">
       {/* Controls Sidebar */}
       <div className="flex-none lg:h-screen lg:sticky lg:top-0">
         <Controls
