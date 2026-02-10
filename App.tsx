@@ -164,6 +164,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await logoutUser();
+    setShowLanding(true);
   };
 
   const handleSaveTemplateAction = async (name: string, isPublic: boolean, sharedWith: string[]) => {
