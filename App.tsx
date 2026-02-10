@@ -209,7 +209,14 @@ const App: React.FC = () => {
   };
 
   if (showLanding) {
-    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    return (
+      <LandingPage 
+        onGetStarted={() => setShowLanding(false)} 
+        user={user}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (

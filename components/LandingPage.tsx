@@ -1,11 +1,18 @@
-import React from 'react';
-import { PenTool, Sparkles, Share2, ArrowRight, Layout, Palette, Cloud, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { PenTool, Sparkles, ArrowRight, Layout, Palette, Cloud, CheckCircle2, HelpCircle, LogIn, LogOut, User } from 'lucide-react';
+import { UserProfile } from '../types';
+import HelpModal from './HelpModal';
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  user: UserProfile | null;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, user, onLogin, onLogout }) => {
+  const [showHelp, setShowHelp] = useState(false);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-indigo-100">
       {/* Navigation */}
@@ -15,14 +22,64 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
                <PenTool size={20} />
             </div>
-            Certificate Maker
+            <span className="hidden sm:inline">Certificate Maker</span>
           </div>
-          <button
-            onClick={onGetStarted}
-            className="px-5 py-2 text-sm font-semibold text-white bg-slate-900 rounded-full hover:bg-slate-800 transition-all hover:shadow-lg hover:-translate-y-0.5"
-          >
-            Launch App
-          </button>
+
+          <div className="flex items-center gap-3">
+             <button
+               onClick={() => setShowHelp(true)}
+               className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+               title="What is this?"
+             >
+               <HelpCircle size={20} />
+             </button>
+
+             <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
+             {user ? (
+                <div className="flex items-center gap-3">
+                   <div className="hidden sm:flex flex-col items-end mr-1">
+                      <span className="text-xs text-slate-500 font-medium">Welcome back</span>
+                      <span className="text-xs font-bold text-slate-900 max-w-[100px] truncate">{user.displayName}</span>
+                   </div>
+                   {user.photoURL ? (
+                     <img src={user.photoURL} className="w-8 h-8 rounded-full border border-slate-200" alt="Profile"/>
+                   ) : (
+                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                       <User size={14} />
+                     </div>
+                   )}
+                   <button 
+                     onClick={onLogout}
+                     className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                     title="Logout"
+                   >
+                     <LogOut size={18} />
+                   </button>
+                   <button
+                    onClick={onGetStarted}
+                    className="ml-2 px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-full hover:bg-slate-800 transition-all hover:shadow-lg"
+                  >
+                    Open Editor
+                  </button>
+                </div>
+             ) : (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onLogin}
+                    className="text-sm font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-2"
+                  >
+                    <LogIn size={16} /> Sign In
+                  </button>
+                  <button
+                    onClick={onGetStarted}
+                    className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-all hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    Launch App
+                  </button>
+                </div>
+             )}
+          </div>
         </div>
       </nav>
 
@@ -44,9 +101,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
             <button
               onClick={onGetStarted}
-              className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-xl font-semibold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 hover:shadow-2xl hover:shadow-indigo-300 hover:-translate-y-1 flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-xl font-semibold text-lg hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 flex items-center justify-center gap-2"
             >
               Start Designing Now <ArrowRight size={20} />
+            </button>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl font-semibold text-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+            >
+              <HelpCircle size={20} /> How it Works
             </button>
           </div>
         </div>
@@ -138,6 +201,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
           <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
         </div>
       </footer>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 };
