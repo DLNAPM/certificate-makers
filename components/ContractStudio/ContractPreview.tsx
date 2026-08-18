@@ -1,8 +1,16 @@
 import React from 'react';
-import { ContractField, ContractSignature, ContractTheme } from '../../types';
+import { 
+  ContractField, 
+  ContractSignature, 
+  ContractTheme, 
+  OfficialSealType, 
+  SealPosition, 
+  SealEffectStyle 
+} from '../../types';
 import { renderContractText } from '../../services/documentParser';
 import { CONTRACT_THEMES } from '../../constants';
 import { Award, ShieldCheck, PenTool, CheckCircle, Sparkles } from 'lucide-react';
+import OfficialSeal from '../OfficialSeal';
 
 interface ContractPreviewProps {
   title: string;
@@ -11,9 +19,15 @@ interface ContractPreviewProps {
   signatures: ContractSignature[];
   includeSignatures?: boolean;
   themeId: string;
-  sealType: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
+  sealType: OfficialSealType;
+  customSealUrl?: string;
+  sealPosition?: SealPosition;
+  sealSize?: number;
+  sealEffect?: SealEffectStyle;
+  ribbonColor?: 'gold' | 'navy' | 'burgundy' | 'emerald' | 'none';
   highlightPlaceholders: boolean;
   onOpenSignatureModal: (signature: ContractSignature) => void;
+  onOpenSealModal?: () => void;
 }
 
 const ContractPreview: React.FC<ContractPreviewProps> = ({
@@ -24,8 +38,14 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
   includeSignatures = true,
   themeId,
   sealType,
+  customSealUrl,
+  sealPosition = 'header_right',
+  sealSize = 84,
+  sealEffect = 'gold_foil',
+  ribbonColor = 'none',
   highlightPlaceholders,
   onOpenSignatureModal,
+  onOpenSealModal,
 }) => {
   const theme = CONTRACT_THEMES.find(t => t.id === themeId) || CONTRACT_THEMES[0];
 
@@ -34,6 +54,33 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
 
   // Split into paragraphs for proper typographic structure
   const paragraphs = processedText.split('\n\n').filter(p => p.trim());
+
+  // Render Seal helper
+  const renderSeal = (extraClasses: string = '') => {
+    if (sealType === 'none') return null;
+
+    return (
+      <div 
+        onClick={onOpenSealModal}
+        className={`group relative select-none ${onOpenSealModal ? 'cursor-pointer' : ''} ${extraClasses}`}
+        title={onOpenSealModal ? "Click to change or upload Official Seal / Medallion" : undefined}
+      >
+        <OfficialSeal
+          sealType={sealType}
+          customSealUrl={customSealUrl}
+          size={sealSize}
+          effect={sealEffect}
+          ribbonColor={ribbonColor}
+          interactive={!!onOpenSealModal}
+        />
+        {onOpenSealModal && (
+          <div className="no-print absolute -bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap transition-opacity pointer-events-none z-30">
+            Edit Seal
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="w-full flex justify-center py-6 px-2 sm:px-6">
@@ -46,6 +93,19 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
           fontFamily: theme.bodyFont === 'font-serif' ? "'Plus Jakarta Sans', Georgia, serif" : 'inherit'
         }}
       >
+        {/* Watermark Seal if chosen */}
+        {sealPosition === 'watermark' && sealType !== 'none' && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0 select-none overflow-hidden">
+            <OfficialSeal
+              sealType={sealType}
+              customSealUrl={customSealUrl}
+              size={Math.max(260, sealSize * 3)}
+              effect="original"
+              ribbonColor="none"
+            />
+          </div>
+        )}
+
         {/* Outer & Inner Decorative Borders */}
         {theme.pageBorder === 'double' && (
           <>
@@ -85,8 +145,16 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
           
           {/* Header & Seal */}
           <div>
-            <div className="flex items-start justify-between border-b pb-6 mb-8 gap-4" style={{ borderColor: `${theme.accentColor}33` }}>
-              <div className="flex-1 text-center sm:text-left">
+            <div className={`flex items-start justify-between border-b pb-6 mb-8 gap-4 ${sealPosition === 'header_center' ? 'flex-col sm:flex-row items-center text-center' : ''}`} style={{ borderColor: `${theme.accentColor}33` }}>
+              
+              {/* Left Seal if header_left */}
+              {sealPosition === 'header_left' && (
+                <div className="shrink-0 hidden sm:flex">
+                  {renderSeal()}
+                </div>
+              )}
+
+              <div className={`flex-1 ${sealPosition === 'header_center' ? 'text-center' : 'text-center sm:text-left'}`}>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
                   <span
                     className="text-[11px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded"
@@ -106,38 +174,17 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
                 </h1>
               </div>
 
-              {/* Official Seal / Medallion */}
-              {sealType !== 'none' && (
-                <div className="hidden sm:flex flex-col items-center justify-center shrink-0">
-                  {sealType === 'covenant_gold' && (
-                    <div className="w-20 h-20 rounded-full border-2 border-yellow-600 bg-gradient-to-br from-yellow-100 via-amber-50 to-yellow-200 flex flex-col items-center justify-center shadow-md text-amber-900 text-center p-1 relative group">
-                      <div className="w-16 h-16 rounded-full border border-dashed border-amber-600 flex flex-col items-center justify-center">
-                        <Award size={20} className="text-amber-700 mb-0.5" />
-                        <span className="text-[7px] font-black uppercase tracking-tighter">Covenant</span>
-                        <span className="text-[6px] font-bold uppercase tracking-widest text-amber-700">Official Seal</span>
-                      </div>
-                    </div>
-                  )}
+              {/* Center Seal if header_center */}
+              {sealPosition === 'header_center' && (
+                <div className="my-2 sm:my-0 shrink-0">
+                  {renderSeal()}
+                </div>
+              )}
 
-                  {sealType === 'counseling_ribbon' && (
-                    <div className="w-20 h-20 rounded-full border-2 border-indigo-700 bg-gradient-to-br from-indigo-50 to-blue-100 flex flex-col items-center justify-center shadow-md text-indigo-900 text-center p-1">
-                      <div className="w-16 h-16 rounded-full border border-dashed border-indigo-500 flex flex-col items-center justify-center">
-                        <ShieldCheck size={20} className="text-indigo-700 mb-0.5" />
-                        <span className="text-[7px] font-black uppercase tracking-tighter">Ministry</span>
-                        <span className="text-[6px] font-bold uppercase tracking-widest text-indigo-700">Verified</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {sealType === 'classic_crest' && (
-                    <div className="w-20 h-20 rounded-full border-2 border-slate-700 bg-slate-100 flex flex-col items-center justify-center shadow-md text-slate-800 text-center p-1">
-                      <div className="w-16 h-16 rounded-full border border-dashed border-slate-400 flex flex-col items-center justify-center">
-                        <Sparkles size={18} className="text-slate-700 mb-0.5" />
-                        <span className="text-[7px] font-black uppercase tracking-tighter">Sacred Accord</span>
-                        <span className="text-[6px] font-bold uppercase tracking-widest text-slate-600">Legal Standard</span>
-                      </div>
-                    </div>
-                  )}
+              {/* Right Seal if header_right (default) */}
+              {sealPosition === 'header_right' && (
+                <div className="hidden sm:flex shrink-0">
+                  {renderSeal()}
                 </div>
               )}
             </div>
@@ -180,64 +227,83 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
           {/* Signatures & Execution Section (Conditional based on creator enable/disable toggle) */}
           {includeSignatures && signatures.length > 0 && (
             <div className="mt-12 pt-8 border-t break-inside-avoid print:mt-6 print:pt-4" style={{ borderColor: `${theme.accentColor}33` }}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 print:grid-cols-3">
-                {signatures.map((sig) => {
-                  const hasSignature = !!(sig.signatureData || (sig.type === 'type' && sig.name));
+              
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-end gap-6">
+                
+                {/* Bottom Left Seal if chosen */}
+                {sealPosition === 'bottom_left' && (
+                  <div className="shrink-0 flex items-center justify-center p-2 mb-2">
+                    {renderSeal()}
+                  </div>
+                )}
 
-                  return (
-                    <div
-                      key={sig.id}
-                      className="flex flex-col justify-end p-4 rounded-xl border border-dashed border-slate-300 bg-white/60 print:bg-transparent print:border-none print:p-0 transition-all hover:border-indigo-400 group"
-                    >
-                      <div className="min-h-[60px] flex items-end justify-center mb-1 relative">
-                        {sig.signatureData ? (
-                          <img
-                            src={sig.signatureData}
-                            alt={`${sig.label} signature`}
-                            className="max-h-16 max-w-full object-contain mx-auto"
-                          />
-                        ) : sig.name ? (
-                          <p
-                            className="text-2xl text-slate-800 text-center"
-                            style={{ fontFamily: "'Great Vibes', cursive, serif" }}
+                {/* Signatures Grid */}
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 print:grid-cols-3">
+                  {signatures.map((sig) => {
+                    const hasSignature = !!(sig.signatureData || (sig.type === 'type' && sig.name));
+
+                    return (
+                      <div
+                        key={sig.id}
+                        className="flex flex-col justify-end p-4 rounded-xl border border-dashed border-slate-300 bg-white/60 print:bg-transparent print:border-none print:p-0 transition-all hover:border-indigo-400 group"
+                      >
+                        <div className="min-h-[60px] flex items-end justify-center mb-1 relative">
+                          {sig.signatureData ? (
+                            <img
+                              src={sig.signatureData}
+                              alt={`${sig.label} signature`}
+                              className="max-h-16 max-w-full object-contain mx-auto"
+                            />
+                          ) : sig.name ? (
+                            <p
+                              className="text-2xl text-slate-800 text-center"
+                              style={{ fontFamily: "'Great Vibes', cursive, serif" }}
+                            >
+                              {sig.name}
+                            </p>
+                          ) : null}
+
+                          {/* Interactive Sign Button overlay for web UI */}
+                          <button
+                            onClick={() => onOpenSignatureModal(sig)}
+                            className="no-print absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/80 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-opacity shadow-md cursor-pointer"
                           >
-                            {sig.name}
-                          </p>
-                        ) : null}
+                            <PenTool size={13} /> {hasSignature ? 'Edit Signature' : 'Sign Now'}
+                          </button>
+                        </div>
 
-                        {/* Interactive Sign Button overlay for web UI */}
-                        <button
-                          onClick={() => onOpenSignatureModal(sig)}
-                          className="no-print absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/80 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-opacity shadow-md"
-                        >
-                          <PenTool size={13} /> {hasSignature ? 'Edit Signature' : 'Sign Now'}
-                        </button>
+                        {/* Signature Baseline */}
+                        <div className="border-b-2 border-slate-700 mb-1.5" />
+
+                        <div className="text-center sm:text-left">
+                          <p className="font-bold text-xs text-slate-900 truncate">
+                            {sig.name || '[Name Required]'}
+                          </p>
+                          <p className="text-[11px] font-semibold text-indigo-700 truncate">
+                            {sig.title || sig.label}
+                          </p>
+                          {sig.label && sig.title && sig.label !== sig.title && (
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {sig.label}
+                            </p>
+                          )}
+                          {sig.signedDate && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Signed: {sig.signedDate}
+                            </p>
+                          )}
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
 
-                      {/* Signature Baseline */}
-                      <div className="border-b-2 border-slate-700 mb-1.5" />
-
-                      <div className="text-center sm:text-left">
-                        <p className="font-bold text-xs text-slate-900 truncate">
-                          {sig.name || '[Name Required]'}
-                        </p>
-                        <p className="text-[11px] font-semibold text-indigo-700 truncate">
-                          {sig.title || sig.label}
-                        </p>
-                        {sig.label && sig.title && sig.label !== sig.title && (
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {sig.label}
-                          </p>
-                        )}
-                        {sig.signedDate && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            Signed: {sig.signedDate}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* Bottom Center / Right Seal if chosen */}
+                {(sealPosition === 'bottom_center' || sealPosition === 'bottom_right') && (
+                  <div className="shrink-0 flex items-center justify-center p-2 mb-2">
+                    {renderSeal()}
+                  </div>
+                )}
               </div>
 
               {/* Document Bottom Authentication Footer */}
@@ -255,3 +321,4 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
 };
 
 export default ContractPreview;
+

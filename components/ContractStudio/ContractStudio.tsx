@@ -37,9 +37,20 @@ import {
   Edit3,
   FolderOpen,
   HardDrive,
-  Cloud
+  Cloud,
+  Award
 } from 'lucide-react';
-import { ContractField, ContractSignature, ContractDocument, UserProfile, StandardClause } from '../../types';
+import { 
+  ContractField, 
+  ContractSignature, 
+  ContractDocument, 
+  UserProfile, 
+  StandardClause,
+  OfficialSealType,
+  SealPosition,
+  SealEffectStyle,
+  OfficialSealConfig
+} from '../../types';
 import { SAMPLE_CONTRACTS, CONTRACT_THEMES } from '../../constants';
 import { ParseResult, extractFieldsAndSignatures, parseUploadedContractFile } from '../../services/documentParser';
 import ContractPreview from './ContractPreview';
@@ -49,6 +60,8 @@ import ClauseLibraryModal from './ClauseLibraryModal';
 import IndustryPolishModal from './IndustryPolishModal';
 import SaveContractModal from './SaveContractModal';
 import SavedDraftsModal from './SavedDraftsModal';
+import SealUploadModal from '../SealUploadModal';
+import OfficialSeal from '../OfficialSeal';
 import { PolishResult } from '../../services/polishService';
 
 interface ContractStudioProps {
@@ -72,7 +85,12 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [signatures, setSignatures] = useState<ContractSignature[]>(initialParsed.signatures);
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
   const [selectedThemeId, setSelectedThemeId] = useState('parchment-classic');
-  const [selectedSeal, setSelectedSeal] = useState<'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none'>('covenant_gold');
+  const [selectedSeal, setSelectedSeal] = useState<OfficialSealType>('covenant_gold');
+  const [customSealUrl, setCustomSealUrl] = useState<string>('');
+  const [sealPosition, setSealPosition] = useState<SealPosition>('header_right');
+  const [sealSize, setSealSize] = useState<number>(84);
+  const [sealEffect, setSealEffect] = useState<SealEffectStyle>('gold_foil');
+  const [ribbonColor, setRibbonColor] = useState<'gold' | 'navy' | 'burgundy' | 'emerald' | 'none'>('none');
   
   // UI states
   const [activeTab, setActiveTab] = useState<'fields' | 'text' | 'style' | 'signatures'>('fields');
@@ -81,6 +99,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showClauseModal, setShowClauseModal] = useState(false);
   const [showPolishModal, setShowPolishModal] = useState(false);
+  const [showSealModal, setShowSealModal] = useState(false);
   const [activeSignature, setActiveSignature] = useState<ContractSignature | null>(null);
   const [searchField, setSearchField] = useState('');
   const [saveToast, setSaveToast] = useState(false);
@@ -136,11 +155,49 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     if (draft.sealType) {
       setSelectedSeal(draft.sealType);
     }
+    if (draft.customSealUrl !== undefined) {
+      setCustomSealUrl(draft.customSealUrl);
+    }
+    if (draft.sealPosition) {
+      setSealPosition(draft.sealPosition);
+    }
+    if (draft.sealSize) {
+      setSealSize(draft.sealSize);
+    }
+    if (draft.sealEffect) {
+      setSealEffect(draft.sealEffect);
+    }
+    if (draft.ribbonColor) {
+      setRibbonColor(draft.ribbonColor);
+    }
     setActiveTab('fields');
     setFieldViewMode('template_order');
     setPolishSuccessToast(`Loaded saved draft: "${draft.title}" with ${(draft.fields || []).length} variables`);
     setTimeout(() => setPolishSuccessToast(null), 5000);
     refreshDraftsCount();
+  };
+
+  // Handle applying official seal configuration
+  const handleApplySeal = (config: OfficialSealConfig) => {
+    setSelectedSeal(config.type);
+    if (config.customUrl !== undefined) {
+      setCustomSealUrl(config.customUrl);
+    }
+    if (config.position) {
+      setSealPosition(config.position);
+    }
+    if (config.size) {
+      setSealSize(config.size);
+    }
+    if (config.effect) {
+      setSealEffect(config.effect);
+    }
+    if (config.ribbonColor) {
+      setRibbonColor(config.ribbonColor);
+    }
+
+    setPolishSuccessToast(`Official Seal updated! (${config.type === 'custom' ? 'Custom Uploaded Medallion' : config.type})`);
+    setTimeout(() => setPolishSuccessToast(null), 4000);
   };
 
   // Handle successful save from modal
@@ -1138,27 +1195,95 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 </div>
               </div>
 
-              {/* Seal Selector */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-800">Official Seal / Medallion</h4>
-                <div className="grid grid-cols-2 gap-2.5">
+              {/* Seal Selector & Upload Card */}
+              <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-500 text-slate-950 rounded-lg shadow-2xs">
+                      <Award size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">Official Seal & Medallion</h4>
+                      <p className="text-[11px] text-slate-500">Add an official foil medallion or upload church/ministry seal</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowSealModal(true)}
+                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <Upload size={12} />
+                    <span>{customSealUrl ? 'Manage Seal' : 'Upload / Customize'}</span>
+                  </button>
+                </div>
+
+                {/* Active Seal Preview Thumbnail */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-200 shrink-0">
+                      {selectedSeal === 'none' ? (
+                        <span className="text-[10px] text-slate-400 font-bold">No Seal</span>
+                      ) : (
+                        <OfficialSeal
+                          sealType={selectedSeal}
+                          customSealUrl={customSealUrl}
+                          size={44}
+                          effect={sealEffect}
+                          ribbonColor={ribbonColor}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        {selectedSeal === 'custom' 
+                          ? 'Custom Uploaded Medallion' 
+                          : selectedSeal === 'covenant_gold' ? 'Covenant Gold Foil'
+                          : selectedSeal === 'counseling_ribbon' ? 'Ministry Shield & Ribbon'
+                          : selectedSeal === 'classic_crest' ? 'Classic Crest Notary'
+                          : selectedSeal === 'cross_rings' ? 'Holy Union Rings'
+                          : selectedSeal === 'dove_peace' ? 'Dove of Peace'
+                          : 'No Seal'}
+                      </p>
+                      <p className="text-[10px] text-slate-500 capitalize">
+                        Position: {sealPosition.replace('_', ' ')} • {sealSize}px
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSealModal(true)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                {/* Quick Seal Selection Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                   {[
-                    { id: 'covenant_gold', name: 'Gold Covenant Seal', icon: '🏆' },
-                    { id: 'counseling_ribbon', name: 'Ministry Ribbon', icon: '🛡️' },
-                    { id: 'classic_crest', name: 'Legal Standard Crest', icon: '✨' },
-                    { id: 'none', name: 'No Seal (Clean)', icon: '⚪' },
+                    { id: 'covenant_gold', name: 'Gold Foil', icon: '🏆' },
+                    { id: 'counseling_ribbon', name: 'Ministry', icon: '🛡️' },
+                    { id: 'classic_crest', name: 'Heraldic', icon: '✨' },
+                    { id: 'cross_rings', name: 'Sacred Rings', icon: '💍' },
+                    { id: 'dove_peace', name: 'Peace Dove', icon: '🕊️' },
+                    { id: 'none', name: 'No Seal', icon: '⚪' },
                   ].map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => setSelectedSeal(s.id as any)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      onClick={() => {
+                        setSelectedSeal(s.id as any);
+                        if (s.id === 'counseling_ribbon') setRibbonColor('navy');
+                      }}
+                      className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${
                         selectedSeal === s.id
-                          ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50/40'
+                          ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50/50'
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
-                      <span className="text-lg block mb-1">{s.icon}</span>
-                      <p className="text-xs font-bold text-slate-900">{s.name}</p>
+                      <span className="text-base">{s.icon}</span>
+                      <p className="text-xs font-bold text-slate-800 truncate">{s.name}</p>
                     </button>
                   ))}
                 </div>
@@ -1397,6 +1522,15 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               </button>
 
               <button
+                onClick={() => setShowSealModal(true)}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100 cursor-pointer shadow-2xs"
+                title="Upload custom official seal or change medallion"
+              >
+                <Award size={12} className="text-amber-600" />
+                <span>Seal: {selectedSeal === 'custom' ? 'Custom' : selectedSeal === 'none' ? 'None' : 'Active'}</span>
+              </button>
+
+              <button
                 onClick={() => setIncludeSignatures(!includeSignatures)}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border ${
                   includeSignatures
@@ -1423,8 +1557,14 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             includeSignatures={includeSignatures}
             themeId={selectedThemeId}
             sealType={selectedSeal}
+            customSealUrl={customSealUrl}
+            sealPosition={sealPosition}
+            sealSize={sealSize}
+            sealEffect={sealEffect}
+            ribbonColor={ribbonColor}
             highlightPlaceholders={highlightPlaceholders}
             onOpenSignatureModal={(sig) => setActiveSignature(sig)}
+            onOpenSealModal={() => setShowSealModal(true)}
           />
         </main>
 
@@ -1457,6 +1597,19 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
         />
       )}
 
+      {showSealModal && (
+        <SealUploadModal
+          currentSealType={selectedSeal}
+          currentCustomUrl={customSealUrl}
+          currentPosition={sealPosition}
+          currentSize={sealSize}
+          currentEffect={sealEffect}
+          currentRibbonColor={ribbonColor}
+          onApplySeal={handleApplySeal}
+          onClose={() => setShowSealModal(false)}
+        />
+      )}
+
       {activeSignature && (
         <SignatureModal
           signature={activeSignature}
@@ -1475,6 +1628,11 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
           includeSignatures={includeSignatures}
           selectedThemeId={selectedThemeId}
           selectedSeal={selectedSeal}
+          customSealUrl={customSealUrl}
+          sealPosition={sealPosition}
+          sealSize={sealSize}
+          sealEffect={sealEffect}
+          ribbonColor={ribbonColor}
           user={user}
           onSaveSuccess={handleSaveSuccess}
           onClose={() => setShowSaveDraftModal(false)}

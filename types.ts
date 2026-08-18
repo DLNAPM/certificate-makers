@@ -11,12 +11,52 @@ export interface Position {
   y: number;
 }
 
+export type OfficialSealType = 
+  | 'covenant_gold' 
+  | 'counseling_ribbon' 
+  | 'classic_crest' 
+  | 'cross_rings' 
+  | 'dove_peace' 
+  | 'custom' 
+  | 'none';
+
+export type SealPosition = 
+  | 'header_right' 
+  | 'header_left' 
+  | 'header_center' 
+  | 'bottom_left' 
+  | 'bottom_center' 
+  | 'bottom_right' 
+  | 'watermark';
+
+export type SealEffectStyle = 
+  | 'original' 
+  | 'gold_foil' 
+  | 'silver_notary' 
+  | 'wax_stamp';
+
+export interface OfficialSealConfig {
+  type: OfficialSealType;
+  customUrl?: string;
+  position?: SealPosition;
+  size?: number; // pixel diameter e.g. 80
+  effect?: SealEffectStyle;
+  ribbonColor?: 'gold' | 'navy' | 'burgundy' | 'emerald' | 'none';
+  customTitle?: string;
+  customSubtitle?: string;
+}
+
 export interface CertificateLayout {
   sloganSize: number;
   signatureWidth: number;
   brideSigPos: Position;
   groomSigPos: Position;
   counselorSigPos: Position;
+  sealPos?: Position;
+  showSeal?: boolean;
+  sealType?: OfficialSealType;
+  customSealUrl?: string;
+  sealSize?: number;
 }
 
 export interface BackgroundOption {
@@ -87,7 +127,7 @@ export interface ContractTheme {
   headerFont: string;
   bodyFont: string;
   accentColor: string;
-  sealType: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
+  sealType: OfficialSealType;
   pageBorder: 'double' | 'single' | 'ornate' | 'clean';
 }
 
@@ -102,7 +142,12 @@ export interface ContractDocument {
   signatures: ContractSignature[];
   includeSignatures?: boolean;
   themeId: string;
-  sealType: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
+  sealType: OfficialSealType;
+  customSealUrl?: string;
+  sealPosition?: SealPosition;
+  sealSize?: number;
+  sealEffect?: SealEffectStyle;
+  ribbonColor?: 'gold' | 'navy' | 'burgundy' | 'emerald' | 'none';
   createdAt: number;
   updatedAt: number;
   notes?: string;

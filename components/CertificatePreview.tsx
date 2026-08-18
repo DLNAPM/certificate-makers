@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CertificateData, BackgroundOption, CertificateLayout, Position } from '../types';
+import OfficialSeal from './OfficialSeal';
 
 interface CertificatePreviewProps {
   data: CertificateData;
@@ -184,13 +185,36 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
             </p>
           </div>
 
-          {/* Signatures Section (Absolute Positioning Layer) */}
+          {/* Signatures & Seal Section (Absolute Positioning Layer) */}
           <div className="absolute inset-0 pointer-events-none">
              {/* We re-enable pointer events on the items themselves */}
              <div className="w-full h-full relative pointer-events-auto">
                 {renderSignatureBlock('Signature of Bride-to-Be', 'brideSigPos', data.brideName)}
                 {renderSignatureBlock('Pre-Marital Counselor', 'counselorSigPos', data.counselorName)}
                 {renderSignatureBlock('Signature of Groom-to-Be', 'groomSigPos', data.groomName)}
+
+                {/* Draggable Official Seal / Medallion */}
+                {(layout.showSeal !== false && layout.sealType !== 'none') && (
+                  <div
+                    className="absolute cursor-move select-none group"
+                    style={{ 
+                      left: layout.sealPos?.x ?? 480, 
+                      top: layout.sealPos?.y ?? 640 
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'sealPos')}
+                    title="Drag to reposition Official Seal"
+                  >
+                    <div className="p-1 border border-transparent hover:border-dashed hover:border-amber-500 rounded-full transition-colors print:border-none print:p-0">
+                      <OfficialSeal
+                        sealType={layout.sealType || 'covenant_gold'}
+                        customSealUrl={layout.customSealUrl}
+                        size={layout.sealSize || 84}
+                        effect="gold_foil"
+                        ribbonColor="none"
+                      />
+                    </div>
+                  </div>
+                )}
              </div>
           </div>
 

@@ -10,7 +10,15 @@ import {
   AlertCircle,
   Copy
 } from 'lucide-react';
-import { ContractDocument, ContractField, ContractSignature, UserProfile } from '../../types';
+import { 
+  ContractDocument, 
+  ContractField, 
+  ContractSignature, 
+  UserProfile, 
+  OfficialSealType, 
+  SealPosition, 
+  SealEffectStyle 
+} from '../../types';
 
 interface SaveContractModalProps {
   currentDraftId: string | null;
@@ -20,7 +28,12 @@ interface SaveContractModalProps {
   signatures: ContractSignature[];
   includeSignatures: boolean;
   selectedThemeId: string;
-  selectedSeal: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
+  selectedSeal: OfficialSealType;
+  customSealUrl?: string;
+  sealPosition?: SealPosition;
+  sealSize?: number;
+  sealEffect?: SealEffectStyle;
+  ribbonColor?: 'gold' | 'navy' | 'burgundy' | 'emerald' | 'none';
   user: UserProfile | null;
   onSaveSuccess: (savedDoc: ContractDocument, isCloud: boolean) => void;
   onClose: () => void;
@@ -35,6 +48,11 @@ const SaveContractModal: React.FC<SaveContractModalProps> = ({
   includeSignatures,
   selectedThemeId,
   selectedSeal,
+  customSealUrl,
+  sealPosition,
+  sealSize,
+  sealEffect,
+  ribbonColor,
   user,
   onSaveSuccess,
   onClose
@@ -76,6 +94,11 @@ const SaveContractModal: React.FC<SaveContractModalProps> = ({
         includeSignatures,
         themeId: selectedThemeId,
         sealType: selectedSeal,
+        customSealUrl,
+        sealPosition,
+        sealSize,
+        sealEffect,
+        ribbonColor,
         createdAt: saveMode === 'update' ? now : now,
         updatedAt: now,
         notes: notes.trim() || undefined

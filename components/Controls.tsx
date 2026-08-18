@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CertificateData, BackgroundOption, CertificateLayout, UserProfile } from '../types';
-import { Printer, PenTool, Layout, RefreshCw, FilePlus, Sparkles, Mic, MicOff, Save, Download, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Printer, PenTool, Layout, RefreshCw, FilePlus, Sparkles, Mic, MicOff, Save, Download, LogIn, LogOut, User as UserIcon, Award, Upload } from 'lucide-react';
 
 interface ControlsProps {
   data: CertificateData;
@@ -269,6 +269,91 @@ const Controls: React.FC<ControlsProps> = ({
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
             />
           </div>
+        </div>
+
+        {/* Official Seal / Medallion Controls */}
+        <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
+              <Award size={16} className="text-amber-600" /> Official Seal / Medallion
+            </h3>
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 font-bold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={layout.showSeal !== false}
+                onChange={(e) => onLayoutChange('showSeal', e.target.checked)}
+                className="w-3.5 h-3.5 rounded text-indigo-600 accent-indigo-600"
+              />
+              <span>Display</span>
+            </label>
+          </div>
+
+          {layout.showSeal !== false && (
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'covenant_gold', name: 'Gold Foil' },
+                  { id: 'counseling_ribbon', name: 'Ministry' },
+                  { id: 'classic_crest', name: 'Classic' },
+                  { id: 'cross_rings', name: 'Rings' },
+                  { id: 'dove_peace', name: 'Dove' },
+                  { id: 'none', name: 'None' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => onLayoutChange('sealType', s.id)}
+                    className={`px-2 py-1.5 text-xs font-bold rounded-lg border transition-all truncate ${
+                      (layout.sealType || 'covenant_gold') === s.id
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-1 ring-indigo-500'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Upload Custom Seal Image */}
+              <div>
+                <label className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-white border border-dashed border-indigo-300 hover:border-indigo-500 text-indigo-700 hover:bg-indigo-50/50 rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                  <Upload size={14} />
+                  <span>{layout.customSealUrl ? 'Replace Custom Seal Image' : 'Upload Custom Seal / Logo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          onLayoutChange('customSealUrl', evt.target?.result as string);
+                          onLayoutChange('sealType', 'custom');
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* Seal Size */}
+              <div>
+                <div className="flex justify-between text-xs text-slate-600 mb-1">
+                  <span>Seal Diameter:</span>
+                  <span className="font-bold">{layout.sealSize || 84}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="50"
+                  max="130"
+                  value={layout.sealSize || 84}
+                  onChange={(e) => onLayoutChange('sealSize', parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AI Background Generator */}
