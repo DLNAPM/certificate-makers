@@ -171,9 +171,10 @@ export async function parseTextFile(file: File, baseTitle: string): Promise<Pars
  * 2. Colon prompts with blank lines: "Bride Name: _________", "Date: _________"
  * 3. Underline fill-in blanks in text: "entered into on _____ day of _______"
  * 4. Named headers or form blocks
+ * 
+ * Preserves the EXACT sequential order of variables as they appear in the template from top to bottom.
  */
 export function extractFieldsAndSignatures(text: string, defaultTitle: string) {
-  const fieldsMap = new Map<string, ContractField>();
   let transformedText = text;
 
   // Try to find a clean document title from the first non-empty line
@@ -184,49 +185,7 @@ export function extractFieldsAndSignatures(text: string, defaultTitle: string) {
   }
 
   // -------------------------------------------------------------
-  // PASS 1: Detect Bracketed Variables: [...], {{...}}, <...>, {...}, __...__, $$...$$, %...%
-  // -------------------------------------------------------------
-  const variableRegexes = [
-    /\[([A-Za-z0-9\s'’/_-]{2,60})\]/g,            // [Bride Name]
-    /\{\{([A-Za-z0-9\s'’/_-]{2,60})\}\}/g,        // {{bride_name}}
-    /<([A-Za-z0-9\s'’/_-]{2,60})>/g,              // <Bride Name>
-    /\{([A-Za-z0-9\s'’/_-]{2,60})\}/g,            // {Bride Name}
-    /__([A-Za-z0-9\s'’/_-]{2,60})__/g,            // __BRIDE_NAME__
-    /\$\$([A-Za-z0-9\s'’/_-]{2,60})\$\$/g,        // $$FEE$$
-    /%([A-Za-z0-9\s'’/_-]{2,60})%/g               // %WEDDING_DATE%
-  ];
-
-  variableRegexes.forEach(regex => {
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
-      const rawPlaceholder = match[0];
-      const innerName = match[1].trim();
-
-      // Skip pure numeric or code tags
-      if (/^\d+$/.test(innerName) || innerName.toLowerCase() === 'page') continue;
-
-      const normalizedKey = normalizeFieldKey(innerName);
-      if (!normalizedKey || normalizedKey.length < 2) continue;
-
-      if (!fieldsMap.has(normalizedKey)) {
-        const matched = findMatchingCommonPattern(innerName, rawPlaceholder);
-        
-        fieldsMap.set(normalizedKey, {
-          id: `field_${normalizedKey}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          key: normalizedKey,
-          placeholder: rawPlaceholder,
-          label: matched ? matched.label : formatLabel(innerName),
-          value: matched ? matched.defaultVal : '',
-          type: matched ? matched.type : guessFieldType(innerName),
-          category: matched ? matched.category : categorizeCustomField(innerName),
-          isCustom: !matched
-        });
-      }
-    }
-  });
-
-  // -------------------------------------------------------------
-  // PASS 2: Detect Colon Blanks e.g. "Bride Name: ____________", "Officiant: ________________"
+  // PRE-PASS A: Transform Colon Blanks e.g. "Bride Name: ____________" -> "Bride Name: [Bride Name]"
   // -------------------------------------------------------------
   const colonBlankRegex = /([A-Za-z0-9\s/&'-]{3,40}):\s*(_{3,}|\[\s*\]|\.{3,})/g;
   let colonMatch: RegExpExecArray | null;
@@ -234,98 +193,93 @@ export function extractFieldsAndSignatures(text: string, defaultTitle: string) {
     const rawMatch = colonMatch[0];
     const labelCandidate = colonMatch[1].trim();
 
-    // Skip generic text or non-form prompts
-    if (/^(note|warning|section|article|clause|page|ref)$/i.test(labelCandidate)) continue;
-
-    const normalizedKey = normalizeFieldKey(labelCandidate);
-    if (!normalizedKey || normalizedKey.length < 2) continue;
-
-    const newPlaceholder = `[${labelCandidate}]`;
-    // Transform document text so the blank line is replaced with standardized bracket placeholder
-    transformedText = transformedText.replace(rawMatch, `${labelCandidate}: ${newPlaceholder}`);
-
-    if (!fieldsMap.has(normalizedKey)) {
-      const matched = findMatchingCommonPattern(labelCandidate, rawMatch);
-
-      fieldsMap.set(normalizedKey, {
-        id: `field_${normalizedKey}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        key: normalizedKey,
-        placeholder: newPlaceholder,
-        label: matched ? matched.label : formatLabel(labelCandidate),
-        value: matched ? matched.defaultVal : '',
-        type: matched ? matched.type : guessFieldType(labelCandidate),
-        category: matched ? matched.category : categorizeCustomField(labelCandidate),
-        isCustom: !matched
-      });
+    // Skip non-form prompt headers
+    if (!/^(note|warning|section|article|clause|page|ref|tel|fax)$/i.test(labelCandidate)) {
+      const newPlaceholder = `[${labelCandidate}]`;
+      transformedText = transformedText.replace(rawMatch, `${labelCandidate}: ${newPlaceholder}`);
     }
   }
 
   // -------------------------------------------------------------
-  // PASS 3: Detect Date blanks like "this _____ day of ____________, 20___"
+  // PRE-PASS B: Transform Date Blanks like "this _____ day of ____________, 20___"
   // -------------------------------------------------------------
   const dayOfMonthRegex = /this\s+_{2,}\s+day\s+of\s+_{3,},\s*20_{2,}/gi;
   if (dayOfMonthRegex.test(transformedText)) {
     transformedText = transformedText.replace(dayOfMonthRegex, 'this [Agreement Date]');
-    if (!fieldsMap.has('agreementdate')) {
-      fieldsMap.set('agreementdate', {
-        id: `field_agreementdate_${Date.now()}`,
-        key: 'agreementDate',
-        placeholder: '[Agreement Date]',
-        label: 'Agreement Date',
-        value: 'October 24, 2026',
-        type: 'date',
-        category: 'Dates & Venue',
-        isCustom: false
-      });
-    }
   }
 
   // -------------------------------------------------------------
-  // PASS 4: Detect Party In-line Blanks: "between ___________ (Bride) and ___________ (Groom)"
+  // PRE-PASS C: Transform Inline Blanks "between ___________ (Party 1) and ___________ (Party 2)"
   // -------------------------------------------------------------
   const inlinePartyRegex = /between\s+_{3,}\s*(?:\(([^)]+)\))?\s+and\s+_{3,}\s*(?:\(([^)]+)\))?/gi;
   let partyMatch: RegExpExecArray | null;
   if ((partyMatch = inlinePartyRegex.exec(transformedText)) !== null) {
-    const p1Label = partyMatch[1] ? partyMatch[1].trim() : 'Bride / Spouse 1';
-    const p2Label = partyMatch[2] ? partyMatch[2].trim() : 'Groom / Spouse 2';
-
+    const p1Label = partyMatch[1] ? partyMatch[1].trim() : 'Party 1 Name';
+    const p2Label = partyMatch[2] ? partyMatch[2].trim() : 'Party 2 Name';
     transformedText = transformedText.replace(partyMatch[0], `between [${p1Label}] and [${p2Label}]`);
+  }
 
-    const k1 = normalizeFieldKey(p1Label);
-    const k2 = normalizeFieldKey(p2Label);
+  // -------------------------------------------------------------
+  // SEQUENTIAL SCAN: Find all placeholders in the EXACT order they appear in text
+  // -------------------------------------------------------------
+  // Master regex matching all placeholder conventions
+  const masterPlaceholderRegex = /\[([A-Za-z0-9\s'’/_-]{2,60})\]|\{\{([A-Za-z0-9\s'’/_-]{2,60})\}\}|<([A-Za-z0-9\s'’/_-]{2,60})>|\{([A-Za-z0-9\s'’/_-]{2,60})\}|__([A-Za-z0-9\s'’/_-]{2,60})__|\$\$([A-Za-z0-9\s'’/_-]{2,60})\$\$|%([A-Za-z0-9\s'’/_-]{2,60})%/g;
 
-    if (!fieldsMap.has(k1)) {
-      fieldsMap.set(k1, {
-        id: `field_${k1}_${Date.now()}`,
-        key: k1,
-        placeholder: `[${p1Label}]`,
-        label: formatLabel(p1Label),
-        value: 'Jennifer A. Taft',
-        type: 'text',
-        category: 'Parties',
-        isCustom: false
-      });
-    }
-    if (!fieldsMap.has(k2)) {
-      fieldsMap.set(k2, {
-        id: `field_${k2}_${Date.now()}`,
-        key: k2,
-        placeholder: `[${p2Label}]`,
-        label: formatLabel(p2Label),
-        value: 'Clint P. Williams',
-        type: 'text',
-        category: 'Parties',
-        isCustom: false
+  interface DetectedOccurrence {
+    key: string;
+    rawTag: string;
+    innerName: string;
+    firstIndex: number;
+  }
+
+  const occurrencesMap = new Map<string, DetectedOccurrence>();
+  let scanMatch: RegExpExecArray | null;
+
+  while ((scanMatch = masterPlaceholderRegex.exec(transformedText)) !== null) {
+    const rawTag = scanMatch[0];
+    // Find non-undefined capture group
+    const innerName = (scanMatch[1] || scanMatch[2] || scanMatch[3] || scanMatch[4] || scanMatch[5] || scanMatch[6] || scanMatch[7] || '').trim();
+
+    // Skip pure numbers or code identifiers like page numbers
+    if (!innerName || /^\d+$/.test(innerName) || innerName.toLowerCase() === 'page') continue;
+
+    const normalizedKey = normalizeFieldKey(innerName);
+    if (!normalizedKey || normalizedKey.length < 2) continue;
+
+    // Only record first appearance index to preserve reading order
+    if (!occurrencesMap.has(normalizedKey)) {
+      occurrencesMap.set(normalizedKey, {
+        key: normalizedKey,
+        rawTag,
+        innerName,
+        firstIndex: scanMatch.index
       });
     }
   }
 
-  // -------------------------------------------------------------
-  // PASS 5: Fallback defaults if template has no variables detected
-  // -------------------------------------------------------------
-  if (fieldsMap.size === 0) {
+  // Convert to sorted array based on first occurrence position in document
+  const sortedOccurrences = Array.from(occurrencesMap.values()).sort((a, b) => a.firstIndex - b.firstIndex);
+
+  // Build ordered ContractField objects
+  const orderedFields: ContractField[] = sortedOccurrences.map((occ, idx) => {
+    const matchedPattern = findMatchingCommonPattern(occ.innerName, occ.rawTag);
+    return {
+      id: `field_${occ.key}_${idx}_${Date.now()}`,
+      key: occ.key,
+      placeholder: occ.rawTag,
+      label: matchedPattern ? matchedPattern.label : formatLabel(occ.innerName),
+      value: matchedPattern ? matchedPattern.defaultVal : '',
+      type: matchedPattern ? matchedPattern.type : guessFieldType(occ.innerName),
+      category: matchedPattern ? matchedPattern.category : categorizeCustomField(occ.innerName),
+      isCustom: !matchedPattern,
+      orderIndex: idx + 1
+    };
+  });
+
+  // Fallback defaults if template has zero detected variables
+  if (orderedFields.length === 0) {
     COMMON_FIELD_PATTERNS.slice(0, 7).forEach((p, idx) => {
-      fieldsMap.set(p.key.toLowerCase(), {
+      orderedFields.push({
         id: `field_${p.key}_${idx}`,
         key: p.key,
         placeholder: `[${p.label}]`,
@@ -333,76 +287,124 @@ export function extractFieldsAndSignatures(text: string, defaultTitle: string) {
         value: p.defaultVal,
         type: p.type,
         category: p.category,
-        isCustom: false
+        isCustom: false,
+        orderIndex: idx + 1
       });
     });
   }
 
   // -------------------------------------------------------------
-  // PASS 6: Generate Signatures based on detected fields & text
+  // DYNAMIC SIGNATURE GENERATION (Tailored to the uploaded template)
   // -------------------------------------------------------------
   const signatures: ContractSignature[] = [];
+  const fieldsMap = new Map<string, ContractField>();
+  orderedFields.forEach(f => fieldsMap.set(f.key.toLowerCase(), f));
 
-  // Bride / Party 1
-  const brideField = Array.from(fieldsMap.values()).find(f => 
-    /bride|spouse\s*1|wife|party\s*1|party\s*a/i.test(f.label) || /bride|spouse1|party1/i.test(f.key)
+  // 1. Identify primary parties from the uploaded document
+  // Check for Bride / Spouse 1 / Party 1 / Client / Husband / Mentee
+  const party1Field = orderedFields.find(f => 
+    /bride|spouse\s*1|wife|party\s*1|party\s*a|client|participant\s*1|buyer|tenant|employee/i.test(f.label) ||
+    /bride|spouse1|party1|partya|client|participant1/i.test(f.key)
   );
-  signatures.push({
-    id: 'sig_party1',
-    role: 'bride',
-    label: brideField?.label ? `${brideField.label} Signature` : 'Bride / Spouse 1 Signature',
-    name: brideField?.value || 'Jennifer A. Taft',
-    title: 'Spouse 1',
-    type: 'type'
-  });
 
-  // Groom / Party 2
-  const groomField = Array.from(fieldsMap.values()).find(f => 
-    /groom|spouse\s*2|husband|party\s*2|party\s*b/i.test(f.label) || /groom|spouse2|party2/i.test(f.key)
+  // Check for Groom / Spouse 2 / Party 2 / Provider / Contractor / Wife / Mentor
+  const party2Field = orderedFields.find(f => 
+    /groom|spouse\s*2|husband|party\s*2|party\s*b|provider|contractor|vendor|participant\s*2|seller|landlord|employer/i.test(f.label) ||
+    /groom|spouse2|party2|partyb|provider|contractor|vendor|participant2/i.test(f.key)
   );
-  signatures.push({
-    id: 'sig_party2',
-    role: 'groom',
-    label: groomField?.label ? `${groomField.label} Signature` : 'Groom / Spouse 2 Signature',
-    name: groomField?.value || 'Clint P. Williams',
-    title: 'Spouse 2',
-    type: 'type'
-  });
 
-  // Counselor / Officiant
-  const counselorField = Array.from(fieldsMap.values()).find(f => 
-    /counselor|pastor|officiant|minister|clergy/i.test(f.label) || /counselor|officiant|pastor/i.test(f.key)
+  // Check for Counselor / Officiant / Pastor / Facilitator / Authority / Minister
+  const authorityField = orderedFields.find(f => 
+    /counselor|pastor|officiant|minister|clergy|celebrant|facilitator|director|mediator|attorney|notary/i.test(f.label) ||
+    /counselor|officiant|pastor|minister|facilitator/i.test(f.key)
   );
-  signatures.push({
-    id: 'sig_counselor',
-    role: 'counselor',
-    label: counselorField?.label ? `${counselorField.label} Signature` : 'Counselor / Officiant Signature',
-    name: counselorField?.value || 'Rev. Dr. Michael Smith',
-    title: 'Counselor & Officiant',
-    type: 'type'
-  });
 
-  // Check if witnesses were detected
-  const witness1Field = Array.from(fieldsMap.values()).find(f => /witness\s*1/i.test(f.label) || /witness1/i.test(f.key));
-  if (witness1Field) {
+  // Add Party 1 signature block
+  if (party1Field) {
+    const isBride = /bride|wife|fianc[eé]e/i.test(party1Field.label);
     signatures.push({
-      id: 'sig_witness1',
-      role: 'witness',
-      label: 'Witness 1 Signature',
-      name: witness1Field.value || 'Sarah Jenkins',
-      title: 'Witness 1',
+      id: 'sig_party_1',
+      role: isBride ? 'bride' : 'party1',
+      label: `${party1Field.label} Signature`,
+      name: party1Field.value || 'Jennifer A. Taft',
+      title: formatPartyTitle(party1Field.label, 'Party 1'),
+      type: 'type'
+    });
+  } else {
+    signatures.push({
+      id: 'sig_party_1',
+      role: 'party1',
+      label: 'Primary Party / Bride Signature',
+      name: 'Jennifer A. Taft',
+      title: 'Party 1',
       type: 'type'
     });
   }
 
-  const witness2Field = Array.from(fieldsMap.values()).find(f => /witness\s*2/i.test(f.label) || /witness2/i.test(f.key));
+  // Add Party 2 signature block
+  if (party2Field) {
+    const isGroom = /groom|husband|fianc[eé]/i.test(party2Field.label);
+    signatures.push({
+      id: 'sig_party_2',
+      role: isGroom ? 'groom' : 'party2',
+      label: `${party2Field.label} Signature`,
+      name: party2Field.value || 'Clint P. Williams',
+      title: formatPartyTitle(party2Field.label, 'Party 2'),
+      type: 'type'
+    });
+  } else {
+    signatures.push({
+      id: 'sig_party_2',
+      role: 'party2',
+      label: 'Second Party / Groom Signature',
+      name: 'Clint P. Williams',
+      title: 'Party 2',
+      type: 'type'
+    });
+  }
+
+  // Add Authority / Officiant / Counselor signature block if relevant
+  if (authorityField) {
+    signatures.push({
+      id: 'sig_authority',
+      role: 'counselor',
+      label: `${authorityField.label} Signature`,
+      name: authorityField.value || 'Rev. Dr. Michael Smith',
+      title: formatPartyTitle(authorityField.label, 'Counselor / Officiant'),
+      type: 'type'
+    });
+  } else if (/counsel|pastor|church|marriage|wedding|premarital/i.test(transformedText) || /counsel|pastor|church|marriage|wedding/i.test(title)) {
+    signatures.push({
+      id: 'sig_authority',
+      role: 'counselor',
+      label: 'Officiant / Counselor Signature',
+      name: 'Rev. Dr. Michael Smith',
+      title: 'Officiant & Marital Counselor',
+      type: 'type'
+    });
+  }
+
+  // Check for Witness 1 & Witness 2 in uploaded file
+  const witness1Field = orderedFields.find(f => /witness\s*1|first\s*witness/i.test(f.label) || /witness1/i.test(f.key));
+  if (witness1Field) {
+    signatures.push({
+      id: 'sig_witness1',
+      role: 'witness',
+      label: `${witness1Field.label} Signature`,
+      name: witness1Field.value || 'Sarah Jenkins',
+      title: 'Attesting Witness 1',
+      type: 'type'
+    });
+  }
+
+  const witness2Field = orderedFields.find(f => /witness\s*2|second\s*witness/i.test(f.label) || /witness2/i.test(f.key));
   if (witness2Field) {
     signatures.push({
       id: 'sig_witness2',
       role: 'witness',
-      label: 'Witness 2 Signature',
+      label: `${witness2Field.label} Signature`,
       name: witness2Field.value || 'David Miller',
-      title: 'Witness 2',
+      title: 'Attesting Witness 2',
       type: 'type'
     });
   }
@@ -410,9 +412,17 @@ export function extractFieldsAndSignatures(text: string, defaultTitle: string) {
   return {
     title,
     transformedText,
-    fields: Array.from(fieldsMap.values()),
+    fields: orderedFields,
     signatures
   };
+}
+
+/**
+ * Format party title for signature section based on field label
+ */
+function formatPartyTitle(fieldLabel: string, defaultFallback: string): string {
+  const clean = fieldLabel.replace(/\s*Name\b/i, '').replace(/\s*Signature\b/i, '').trim();
+  return clean || defaultFallback;
 }
 
 /**

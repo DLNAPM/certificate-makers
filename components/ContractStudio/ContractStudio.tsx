@@ -28,7 +28,12 @@ import {
   RefreshCw,
   Copy,
   AlertCircle,
-  X
+  X,
+  ListOrdered,
+  LayoutGrid,
+  ToggleLeft,
+  ToggleRight,
+  Edit3
 } from 'lucide-react';
 import { ContractField, ContractSignature, ContractDocument, UserProfile, StandardClause } from '../../types';
 import { SAMPLE_CONTRACTS, CONTRACT_THEMES } from '../../constants';
@@ -57,11 +62,13 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [rawContent, setRawContent] = useState(defaultSample.content);
   const [fields, setFields] = useState<ContractField[]>(initialParsed.fields);
   const [signatures, setSignatures] = useState<ContractSignature[]>(initialParsed.signatures);
+  const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
   const [selectedThemeId, setSelectedThemeId] = useState('parchment-classic');
   const [selectedSeal, setSelectedSeal] = useState<'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none'>('covenant_gold');
   
   // UI states
   const [activeTab, setActiveTab] = useState<'fields' | 'text' | 'style' | 'signatures'>('fields');
+  const [fieldViewMode, setFieldViewMode] = useState<'template_order' | 'categories'>('template_order');
   const [highlightPlaceholders, setHighlightPlaceholders] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showClauseModal, setShowClauseModal] = useState(false);
@@ -74,6 +81,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [scanNotification, setScanNotification] = useState<{
     fileName: string;
     variableCount: number;
+    signatureCount: number;
   } | null>(null);
 
   const leftPaneFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -84,20 +92,31 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     setFields(prev => {
       const updated = prev.map(f => f.id === fieldId ? { ...f, value: newValue } : f);
       
-      // Update matching signature if field is Bride, Groom, or Counselor
+      // Update matching signature if field is Bride, Groom, Party 1, Party 2, or Counselor
       const modifiedField = prev.find(f => f.id === fieldId);
       if (modifiedField) {
         const key = modifiedField.key.toLowerCase();
-        if (key.includes('bride') || key.includes('party1') || key.includes('spouse1')) {
-          setSignatures(sigs => sigs.map(s => s.role === 'bride' ? { ...s, name: newValue } : s));
-        } else if (key.includes('groom') || key.includes('party2') || key.includes('spouse2')) {
-          setSignatures(sigs => sigs.map(s => s.role === 'groom' ? { ...s, name: newValue } : s));
-        } else if (key.includes('counselor') || key.includes('officiant') || key.includes('pastor')) {
-          setSignatures(sigs => sigs.map(s => s.role === 'counselor' ? { ...s, name: newValue } : s));
+        const label = modifiedField.label.toLowerCase();
+
+        if (key.includes('bride') || key.includes('party1') || key.includes('spouse1') || label.includes('bride') || label.includes('party 1')) {
+          setSignatures(sigs => sigs.map(s => (s.role === 'bride' || s.role === 'party1' || s.id === 'sig_party_1') ? { ...s, name: newValue } : s));
+        } else if (key.includes('groom') || key.includes('party2') || key.includes('spouse2') || label.includes('groom') || label.includes('party 2')) {
+          setSignatures(sigs => sigs.map(s => (s.role === 'groom' || s.role === 'party2' || s.id === 'sig_party_2') ? { ...s, name: newValue } : s));
+        } else if (key.includes('counselor') || key.includes('officiant') || key.includes('pastor') || label.includes('counselor') || label.includes('officiant') || label.includes('pastor')) {
+          setSignatures(sigs => sigs.map(s => (s.role === 'counselor' || s.id === 'sig_authority') ? { ...s, name: newValue } : s));
+        } else if (key.includes('witness1') || label.includes('witness 1')) {
+          setSignatures(sigs => sigs.map(s => (s.id === 'sig_witness1') ? { ...s, name: newValue } : s));
+        } else if (key.includes('witness2') || label.includes('witness 2')) {
+          setSignatures(sigs => sigs.map(s => (s.id === 'sig_witness2') ? { ...s, name: newValue } : s));
         }
       }
       return updated;
     });
+  };
+
+  // Update signature properties directly (name, title, label)
+  const handleSignaturePropertyChange = (sigId: string, prop: 'name' | 'title' | 'label', val: string) => {
+    setSignatures(prev => prev.map(s => s.id === sigId ? { ...s, [prop]: val } : s));
   };
 
   // Add custom user-defined field
@@ -117,7 +136,8 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
       value: '',
       type: 'text',
       category: 'Custom Template Variables',
-      isCustom: true
+      isCustom: true,
+      orderIndex: fields.length + 1
     };
 
     setFields(prev => [...prev, newField]);
@@ -132,7 +152,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     setFields(prev => prev.filter(f => f.id !== fieldId));
   };
 
-  // Handle uploaded contract parsed data and auto-generate fields in left pane
+  // Handle uploaded contract parsed data and auto-generate fields in left pane in sequential order
   const handleLoadParsedContract = (result: ParseResult) => {
     setDocumentTitle(result.title);
     setRawContent(result.rawText);
@@ -141,11 +161,13 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     
     // Auto-switch to Fields tab on left pane
     setActiveTab('fields');
+    setFieldViewMode('template_order'); // Default to sequential template order
 
     // Show scan notification
     setScanNotification({
       fileName: result.fileName || result.title,
-      variableCount: result.detectedFields.length
+      variableCount: result.detectedFields.length,
+      signatureCount: result.detectedSignatures.length
     });
   };
 
@@ -163,9 +185,11 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     });
 
     setFields(mergedFields);
+    setSignatures(detected.signatures);
     setScanNotification({
       fileName: 'Current Contract Document',
-      variableCount: mergedFields.length
+      variableCount: mergedFields.length,
+      signatureCount: detected.signatures.length
     });
   };
 
@@ -198,18 +222,28 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     setSignatures(prev => prev.map(s => s.id === updatedSig.id ? updatedSig : s));
   };
 
-  // Add a witness signature block
-  const handleAddWitnessSignature = () => {
-    const witnessCount = signatures.filter(s => s.role === 'witness').length + 1;
-    const newWitness: ContractSignature = {
-      id: `sig_witness_${Date.now()}`,
-      role: 'witness',
-      label: `Witness ${witnessCount} Signature`,
+  // Add a custom signature block
+  const handleAddCustomSignature = () => {
+    const sigTitle = prompt("Enter the title/role for this signature block (e.g. 'Witness 2', 'Elder', 'Guarantor'):");
+    if (!sigTitle || !sigTitle.trim()) return;
+
+    const trimmed = sigTitle.trim();
+    const newSig: ContractSignature = {
+      id: `sig_custom_${Date.now()}`,
+      role: 'other',
+      label: `${trimmed} Signature`,
       name: '',
-      title: `Witness ${witnessCount}`,
+      title: trimmed,
       type: 'type'
     };
-    setSignatures(prev => [...prev, newWitness]);
+    setSignatures(prev => [...prev, newSig]);
+  };
+
+  // Delete signature block
+  const handleDeleteSignature = (sigId: string) => {
+    if (confirm("Remove this signature block?")) {
+      setSignatures(prev => prev.filter(s => s.id !== sigId));
+    }
   };
 
   // Print contract
@@ -272,11 +306,11 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     }));
 
     setSignatures(prev => prev.map(s => {
-      if (s.role === 'bride') return { ...s, name: 'Jennifer Allison Taft' };
-      if (s.role === 'groom') return { ...s, name: 'Clint Patrick Williams' };
-      if (s.role === 'counselor') return { ...s, name: 'Rev. Dr. Michael Smith' };
-      if (s.role === 'witness' && s.id.includes('1')) return { ...s, name: 'Sarah Jenkins' };
-      if (s.role === 'witness' && s.id.includes('2')) return { ...s, name: 'David Miller' };
+      if (s.role === 'bride' || s.id === 'sig_party_1') return { ...s, name: 'Jennifer Allison Taft' };
+      if (s.role === 'groom' || s.id === 'sig_party_2') return { ...s, name: 'Clint Patrick Williams' };
+      if (s.role === 'counselor' || s.id === 'sig_authority') return { ...s, name: 'Rev. Dr. Michael Smith' };
+      if (s.id === 'sig_witness1') return { ...s, name: 'Sarah Jenkins' };
+      if (s.id === 'sig_witness2') return { ...s, name: 'David Miller' };
       return s;
     }));
   };
@@ -292,15 +326,17 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   // Save contract to local storage and show feedback
   const handleSaveContract = () => {
     const savedContracts = JSON.parse(localStorage.getItem('covenant_saved_contracts') || '[]');
-    const newEntry = {
+    const newEntry: ContractDocument = {
       id: `contract_${Date.now()}`,
       title: documentTitle,
       rawContent,
       fields,
       signatures,
+      includeSignatures,
       themeId: selectedThemeId,
       sealType: selectedSeal,
-      savedAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     };
     savedContracts.unshift(newEntry);
     localStorage.setItem('covenant_saved_contracts', JSON.stringify(savedContracts));
@@ -315,6 +351,9 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     f.placeholder.toLowerCase().includes(searchField.toLowerCase()) ||
     (f.category && f.category.toLowerCase().includes(searchField.toLowerCase()))
   );
+
+  // Sequential order sorted fields
+  const orderedFieldsList = [...filteredFields].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
 
   // Group fields by category
   const categories = Array.from(new Set(filteredFields.map(f => f.category || 'General Details')));
@@ -446,7 +485,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
             <button
               onClick={() => setActiveTab('signatures')}
-              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all relative ${
                 activeTab === 'signatures'
                   ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -454,6 +493,9 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             >
               <PenTool size={14} />
               <span>Signatures ({signatures.length})</span>
+              {!includeSignatures && (
+                <span className="w-2 h-2 rounded-full bg-slate-400" title="Signatures disabled" />
+              )}
             </button>
           </div>
 
@@ -472,10 +514,10 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                   </button>
                   <div className="flex items-center gap-2 text-emerald-900 text-xs font-bold">
                     <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                    <span>Template Scanned & Variables Generated</span>
+                    <span>Template Scanned in Sequential Order</span>
                   </div>
                   <p className="text-[11px] text-emerald-800 leading-relaxed pr-4">
-                    Extracted <strong>{scanNotification.variableCount} dynamic variables</strong> from "<strong>{scanNotification.fileName}</strong>". Ready to be filled out below!
+                    Extracted <strong>{scanNotification.variableCount} dynamic variables</strong> listed in the exact order they appear in "<strong>{scanNotification.fileName}</strong>", plus <strong>{scanNotification.signatureCount} matching party signatures</strong>.
                   </p>
                 </div>
               )}
@@ -560,134 +602,269 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 </div>
               </div>
 
-              {/* Search & Add Custom Field */}
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchField}
-                    onChange={(e) => setSearchField(e.target.value)}
-                    placeholder="Search variables..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-                  />
+              {/* View Order Toggle (Template Order vs Categories) & Search */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-600 pl-1.5">Display Order:</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setFieldViewMode('template_order')}
+                      className={`px-2 py-1 text-[11px] font-bold rounded flex items-center gap-1 transition-all ${
+                        fieldViewMode === 'template_order'
+                          ? 'bg-white text-indigo-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="List variables in the exact order they appear in the uploaded template"
+                    >
+                      <ListOrdered size={12} /> Template Order ({orderedFieldsList.length})
+                    </button>
+                    <button
+                      onClick={() => setFieldViewMode('categories')}
+                      className={`px-2 py-1 text-[11px] font-bold rounded flex items-center gap-1 transition-all ${
+                        fieldViewMode === 'categories'
+                          ? 'bg-white text-indigo-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Group variables by category"
+                    >
+                      <LayoutGrid size={12} /> Grouped
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={handleAddCustomField}
-                  className="px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg flex items-center gap-1 shrink-0 transition-colors"
-                  title="Create a new variable field"
-                >
-                  <Plus size={13} /> Add Variable
-                </button>
-                <button
-                  onClick={handleRescanVariables}
-                  className="p-1.5 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg shrink-0 transition-colors"
-                  title="Re-scan document for new bracket variables"
-                >
-                  <RefreshCw size={14} />
-                </button>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchField}
+                      onChange={(e) => setSearchField(e.target.value)}
+                      placeholder="Search variables..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddCustomField}
+                    className="px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg flex items-center gap-1 shrink-0 transition-colors"
+                    title="Create a new variable field"
+                  >
+                    <Plus size={13} /> Add Variable
+                  </button>
+                  <button
+                    onClick={handleRescanVariables}
+                    className="p-1.5 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg shrink-0 transition-colors"
+                    title="Re-scan document for new bracket variables"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                </div>
               </div>
 
-              {/* Categorized Fields Form */}
-              <div className="space-y-5">
-                {categories.map((category) => {
-                  const catFields = filteredFields.filter(f => (f.category || 'General Details') === category);
-                  if (catFields.length === 0) return null;
+              {/* LISTING: TEMPLATE ORDER (Sequential Top-to-Bottom as in Template) */}
+              {fieldViewMode === 'template_order' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-200 text-[11px] text-slate-500 font-semibold">
+                    <span>Variables ordered from top to bottom of template</span>
+                    <span>{orderedFieldsList.length} total</span>
+                  </div>
 
-                  return (
-                    <div key={category} className="space-y-2.5">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-1">
-                        <span className="text-[11px] font-black tracking-wider uppercase text-slate-500">
-                          {category}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
-                          {catFields.length} {catFields.length === 1 ? 'variable' : 'variables'}
-                        </span>
-                      </div>
+                  {orderedFieldsList.map((field, index) => {
+                    const isFilled = field.value && field.value.trim().length > 0;
 
-                      <div className="space-y-2.5">
-                        {catFields.map((field) => {
-                          const isFilled = field.value && field.value.trim().length > 0;
+                    return (
+                      <div
+                        key={field.id}
+                        className={`p-3 rounded-xl border transition-all ${
+                          isFilled
+                            ? 'bg-slate-50/70 border-slate-200'
+                            : 'bg-white border-amber-200/80 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <span className="w-5 h-5 rounded-md bg-indigo-100 text-indigo-700 font-mono text-[10px] flex items-center justify-center font-black shrink-0">
+                              #{field.orderIndex || index + 1}
+                            </span>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isFilled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                            <span className="truncate max-w-[170px] sm:max-w-[200px]">{field.label}</span>
+                          </label>
 
-                          return (
-                            <div
-                              key={field.id}
-                              className={`p-3 rounded-xl border transition-all ${
-                                isFilled
-                                  ? 'bg-slate-50/70 border-slate-200'
-                                  : 'bg-white border-amber-200/80 shadow-2xs'
-                              }`}
+                          <div className="flex items-center gap-1">
+                            {field.category && (
+                              <span className="text-[9px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded hidden sm:inline">
+                                {field.category}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleCopyTag(field.placeholder, field.id)}
+                              className="text-[10px] font-mono text-slate-500 hover:text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1 hover:border-indigo-300 transition-colors"
+                              title="Click to copy variable tag to clipboard"
                             >
-                              <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${isFilled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                                  {field.label}
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleCopyTag(field.placeholder, field.id)}
-                                    className="text-[10px] font-mono text-slate-500 hover:text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1 hover:border-indigo-300 transition-colors"
-                                    title="Click to copy variable tag to clipboard"
-                                  >
-                                    {copiedFieldId === field.id ? (
-                                      <>
-                                        <Check size={10} className="text-emerald-600" />
-                                        <span className="text-emerald-700">Copied</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy size={9} />
-                                        <span>{field.placeholder}</span>
-                                      </>
-                                    )}
-                                  </button>
-                                  {field.isCustom && (
-                                    <button
-                                      onClick={() => handleDeleteField(field.id)}
-                                      className="text-slate-400 hover:text-red-600 p-0.5"
-                                      title="Delete custom variable"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              {field.type === 'textarea' ? (
-                                <textarea
-                                  value={field.value}
-                                  onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
-                                  placeholder={`Enter ${field.label.toLowerCase()}...`}
-                                  className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-y"
-                                />
+                              {copiedFieldId === field.id ? (
+                                <>
+                                  <Check size={10} className="text-emerald-600" />
+                                  <span className="text-emerald-700">Copied</span>
+                                </>
                               ) : (
-                                <div className="relative flex items-center">
-                                  <input
-                                    type={field.type === 'date' ? 'text' : field.type}
+                                <>
+                                  <Copy size={9} />
+                                  <span className="max-w-[80px] truncate">{field.placeholder}</span>
+                                </>
+                              )}
+                            </button>
+                            {field.isCustom && (
+                              <button
+                                onClick={() => handleDeleteField(field.id)}
+                                className="text-slate-400 hover:text-red-600 p-0.5"
+                                title="Delete custom variable"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {field.type === 'textarea' ? (
+                          <textarea
+                            value={field.value}
+                            onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                            placeholder={`Enter ${field.label.toLowerCase()}...`}
+                            className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-y"
+                          />
+                        ) : (
+                          <div className="relative flex items-center">
+                            <input
+                              type={field.type === 'date' ? 'text' : field.type}
+                              value={field.value}
+                              onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                              placeholder={`e.g. ${field.placeholder}`}
+                              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium pr-7"
+                            />
+                            {field.value && (
+                              <button
+                                onClick={() => handleFieldValueChange(field.id, '')}
+                                className="absolute right-2 text-slate-400 hover:text-slate-600"
+                                title="Clear value"
+                              >
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* LISTING: CATEGORIZED FIELDS FORM */}
+              {fieldViewMode === 'categories' && (
+                <div className="space-y-5">
+                  {categories.map((category) => {
+                    const catFields = filteredFields
+                      .filter(f => (f.category || 'General Details') === category)
+                      .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+
+                    if (catFields.length === 0) return null;
+
+                    return (
+                      <div key={category} className="space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                          <span className="text-[11px] font-black tracking-wider uppercase text-slate-500">
+                            {category}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
+                            {catFields.length} {catFields.length === 1 ? 'variable' : 'variables'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {catFields.map((field) => {
+                            const isFilled = field.value && field.value.trim().length > 0;
+
+                            return (
+                              <div
+                                key={field.id}
+                                className={`p-3 rounded-xl border transition-all ${
+                                  isFilled
+                                    ? 'bg-slate-50/70 border-slate-200'
+                                    : 'bg-white border-amber-200/80 shadow-2xs'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                    <span className="text-[10px] font-mono text-indigo-600 font-bold">
+                                      #{field.orderIndex || 0}
+                                    </span>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isFilled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                                    {field.label}
+                                  </label>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleCopyTag(field.placeholder, field.id)}
+                                      className="text-[10px] font-mono text-slate-500 hover:text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1 hover:border-indigo-300 transition-colors"
+                                      title="Click to copy variable tag to clipboard"
+                                    >
+                                      {copiedFieldId === field.id ? (
+                                        <>
+                                          <Check size={10} className="text-emerald-600" />
+                                          <span className="text-emerald-700">Copied</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy size={9} />
+                                          <span>{field.placeholder}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                    {field.isCustom && (
+                                      <button
+                                        onClick={() => handleDeleteField(field.id)}
+                                        className="text-slate-400 hover:text-red-600 p-0.5"
+                                        title="Delete custom variable"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {field.type === 'textarea' ? (
+                                  <textarea
                                     value={field.value}
                                     onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
-                                    placeholder={`e.g. ${field.placeholder}`}
-                                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium pr-7"
+                                    placeholder={`Enter ${field.label.toLowerCase()}...`}
+                                    className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-y"
                                   />
-                                  {field.value && (
-                                    <button
-                                      onClick={() => handleFieldValueChange(field.id, '')}
-                                      className="absolute right-2 text-slate-400 hover:text-slate-600"
-                                      title="Clear value"
-                                    >
-                                      <X size={13} />
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                                ) : (
+                                  <div className="relative flex items-center">
+                                    <input
+                                      type={field.type === 'date' ? 'text' : field.type}
+                                      value={field.value}
+                                      onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                                      placeholder={`e.g. ${field.placeholder}`}
+                                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium pr-7"
+                                    />
+                                    {field.value && (
+                                      <button
+                                        onClick={() => handleFieldValueChange(field.id, '')}
+                                        className="absolute right-2 text-slate-400 hover:text-slate-600"
+                                        title="Clear value"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
             </div>
           )}
@@ -709,7 +886,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               <div className="space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500">Insert Placeholder Variable:</span>
                 <div className="flex flex-wrap gap-1">
-                  {fields.slice(0, 10).map(f => (
+                  {orderedFieldsList.slice(0, 12).map(f => (
                     <button
                       key={f.id}
                       onClick={() => setRawContent(prev => `${prev} ${f.placeholder}`)}
@@ -738,6 +915,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                       setDocumentTitle(defaultSample.title);
                       const scanned = extractFieldsAndSignatures(defaultSample.content, defaultSample.title);
                       setFields(scanned.fields);
+                      setSignatures(scanned.signatures);
                     }
                   }}
                   className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-medium"
@@ -812,6 +990,22 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               {/* Document Display Options */}
               <div className="space-y-3 pt-4 border-t border-slate-200">
                 <h4 className="text-xs font-bold text-slate-800">Preview & Output Options</h4>
+                
+                {/* Signatures Toggle Option */}
+                <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Include Bottom Signatures</p>
+                    <p className="text-[10px] text-slate-500">Render digital signature lines at bottom of document & print/PDF</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={includeSignatures}
+                    onChange={(e) => setIncludeSignatures(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                  />
+                </label>
+
+                {/* Highlight Replaced Fields */}
                 <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
                   <div>
                     <p className="text-xs font-bold text-slate-800">Highlight Replaced Fields</p>
@@ -830,43 +1024,124 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
           {/* TAB 4: SIGNATURES */}
           {activeTab === 'signatures' && (
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <PenTool size={14} className="text-indigo-600" /> Digital Signatures & Attestations
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  Draw or type cursive signatures for all covenant parties.
-                </p>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              
+              {/* PRIMARY ENABLE/DISABLE SIGNATURES CONTROL BUTTON */}
+              <div className={`p-4 rounded-xl border transition-all ${
+                includeSignatures
+                  ? 'bg-emerald-50/60 border-emerald-200'
+                  : 'bg-slate-100 border-slate-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase tracking-wide text-slate-900">
+                        Bottom Signatures Block
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        includeSignatures ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {includeSignatures ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      {includeSignatures 
+                        ? 'Signatures and attestation lines will appear at the bottom of the document and in PDF exports.'
+                        : 'Signatures are disabled and will NOT appear at the bottom of this uploaded template.'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setIncludeSignatures(!includeSignatures)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs shrink-0 ${
+                      includeSignatures
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white'
+                    }`}
+                  >
+                    {includeSignatures ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                    <span>{includeSignatures ? 'Disable' : 'Enable'}</span>
+                  </button>
+                </div>
               </div>
 
+              {/* Signatures List (Active when enabled or customizable) */}
               <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-700 font-bold border-b border-slate-200 pb-1">
+                  <span>Signatures Configured For This Document</span>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    {signatures.length} party/parties
+                  </span>
+                </div>
+
+                {!includeSignatures && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center gap-2">
+                    <AlertCircle size={15} className="text-amber-600 shrink-0" />
+                    <span>Signatures are currently turned OFF. Enable the switch above to display them on the contract sheet.</span>
+                  </div>
+                )}
+
                 {signatures.map((sig) => {
                   const hasSig = !!(sig.signatureData || (sig.type === 'type' && sig.name));
 
                   return (
                     <div
                       key={sig.id}
-                      className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs hover:border-indigo-300 transition-all"
+                      className={`p-3.5 bg-white border rounded-xl space-y-3 shadow-2xs transition-all ${
+                        includeSignatures ? 'border-slate-200 hover:border-indigo-300' : 'border-slate-200 opacity-70'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">{sig.label}</p>
-                          <p className="text-[11px] text-slate-500">{sig.name || 'No name specified'}</p>
+                        <div className="flex-1 pr-2">
+                          {/* Editable Signature Title & Role */}
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <input
+                              type="text"
+                              value={sig.title || sig.label}
+                              onChange={(e) => handleSignaturePropertyChange(sig.id, 'title', e.target.value)}
+                              className="text-xs font-bold text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100/80 px-2 py-0.5 rounded border border-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-[200px]"
+                              placeholder="Party Title (e.g. Bride, Client)..."
+                              title="Click to edit the official title/role for this signer"
+                            />
+                            <span className="text-[10px] text-slate-400">
+                              <Edit3 size={10} />
+                            </span>
+                          </div>
+
+                          {/* Editable Signer Name */}
+                          <input
+                            type="text"
+                            value={sig.name}
+                            onChange={(e) => handleSignaturePropertyChange(sig.id, 'name', e.target.value)}
+                            placeholder="Signer Full Name..."
+                            className="text-xs font-medium text-slate-800 bg-slate-50 hover:bg-white px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                          />
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          hasSig ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {hasSig ? 'Signed' : 'Pending'}
-                        </span>
+
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            hasSig ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {hasSig ? 'Signed' : 'Pending'}
+                          </span>
+                          {sig.id.startsWith('sig_custom_') && (
+                            <button
+                              onClick={() => handleDeleteSignature(sig.id)}
+                              className="text-slate-400 hover:text-red-600 p-0.5"
+                              title="Delete this signature block"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Signature Preview Thumbnail */}
-                      <div className="h-16 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex items-center justify-center p-2">
+                      <div className="h-14 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex items-center justify-center p-2">
                         {sig.signatureData ? (
-                          <img src={sig.signatureData} alt="Signature" className="max-h-12 object-contain" />
+                          <img src={sig.signatureData} alt="Signature" className="max-h-11 object-contain" />
                         ) : sig.name ? (
-                          <span className="text-2xl text-slate-800" style={{ fontFamily: "'Great Vibes', cursive, serif" }}>
+                          <span className="text-xl text-slate-800" style={{ fontFamily: "'Great Vibes', cursive, serif" }}>
                             {sig.name}
                           </span>
                         ) : (
@@ -874,15 +1149,15 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                         )}
                       </div>
 
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-100">
                         <span className="text-[10px] text-slate-400">
                           {sig.signedDate ? `Signed on ${sig.signedDate}` : 'Not yet signed'}
                         </span>
                         <button
                           onClick={() => setActiveSignature(sig)}
-                          className="px-3 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition-colors"
+                          className="px-3 py-1 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition-colors"
                         >
-                          <PenTool size={12} /> {hasSig ? 'Edit Signature' : 'Sign Now'}
+                          <PenTool size={11} /> {hasSig ? 'Edit Signature' : 'Sign Now'}
                         </button>
                       </div>
                     </div>
@@ -891,10 +1166,10 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               </div>
 
               <button
-                onClick={handleAddWitnessSignature}
+                onClick={handleAddCustomSignature}
                 className="w-full py-2 px-3 border border-dashed border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
               >
-                <Plus size={14} /> Add Witness Signature Block
+                <Plus size={14} /> Add Additional Signer / Party Block
               </button>
             </div>
           )}
@@ -934,9 +1209,23 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-semibold">Live Interactive Document View</span>
             </div>
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
-              Click any signature line to sign directly on the contract
-            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIncludeSignatures(!includeSignatures)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border ${
+                  includeSignatures
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                }`}
+                title="Toggle bottom signature lines on/off"
+              >
+                <PenTool size={11} />
+                <span>Bottom Signatures: {includeSignatures ? 'ON' : 'OFF'}</span>
+              </button>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                {includeSignatures ? 'Click any signature line to sign directly' : 'Signatures section hidden'}
+              </span>
+            </div>
           </div>
 
           {/* Render Contract Sheet */}
@@ -945,6 +1234,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             rawContent={rawContent}
             fields={fields}
             signatures={signatures}
+            includeSignatures={includeSignatures}
             themeId={selectedThemeId}
             sealType={selectedSeal}
             highlightPlaceholders={highlightPlaceholders}

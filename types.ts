@@ -64,11 +64,12 @@ export interface ContractField {
   required?: boolean;
   isCustom?: boolean;
   options?: string[];
+  orderIndex?: number; // Appearance order in template
 }
 
 export interface ContractSignature {
   id: string;
-  role: 'bride' | 'groom' | 'counselor' | 'witness' | 'other';
+  role: 'bride' | 'groom' | 'counselor' | 'witness' | 'other' | string;
   label: string;
   name: string;
   title?: string;
@@ -99,6 +100,7 @@ export interface ContractDocument {
   rawContent: string;
   fields: ContractField[];
   signatures: ContractSignature[];
+  includeSignatures?: boolean;
   themeId: string;
   sealType: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
   createdAt: number;

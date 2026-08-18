@@ -123,23 +123,45 @@ const ContractUploadModal: React.FC<ContractUploadModalProps> = ({ onLoadParsedC
 
               {/* Scanned Variables Chips */}
               <div className="bg-white/80 p-3.5 rounded-xl border border-emerald-200/80 space-y-2">
-                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-                  Auto-Detected Fillable Fields:
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                    Auto-Detected Fillable Fields (In Template Order):
+                  </span>
+                  <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-100/70 px-2 py-0.5 rounded">
+                    Sequential #{1} - #{parsedPreview.detectedFields.length}
+                  </span>
+                </div>
                 <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
-                  {parsedPreview.detectedFields.map((field) => (
+                  {parsedPreview.detectedFields.map((field, idx) => (
                     <span
                       key={field.id}
                       className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-semibold border border-slate-200"
                     >
+                      <span className="text-[10px] font-mono font-black text-indigo-600">#{field.orderIndex || idx + 1}</span>
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                       {field.label}
                       <span className="text-[10px] text-slate-500 font-mono font-normal">
-                        ({field.category || 'General'})
+                        ({field.placeholder})
                       </span>
                     </span>
                   ))}
                 </div>
+
+                {/* Scanned Signatures preview */}
+                {parsedPreview.detectedSignatures && parsedPreview.detectedSignatures.length > 0 && (
+                  <div className="pt-2 border-t border-emerald-200/60 mt-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                      Matching Signatures Detected ({parsedPreview.detectedSignatures.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {parsedPreview.detectedSignatures.map(sig => (
+                        <div key={sig.id} className="text-[11px] px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-md font-medium">
+                          <strong>{sig.title || sig.label}:</strong> {sig.name || '[Name from Field]'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-2">

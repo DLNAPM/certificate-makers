@@ -9,6 +9,7 @@ interface ContractPreviewProps {
   rawContent: string;
   fields: ContractField[];
   signatures: ContractSignature[];
+  includeSignatures?: boolean;
   themeId: string;
   sealType: 'covenant_gold' | 'counseling_ribbon' | 'classic_crest' | 'none';
   highlightPlaceholders: boolean;
@@ -20,6 +21,7 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
   rawContent,
   fields,
   signatures,
+  includeSignatures = true,
   themeId,
   sealType,
   highlightPlaceholders,
@@ -146,8 +148,9 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
                 // If it's a section title e.g. "1. PURPOSE & COMMITMENT" or "RECITALS"
                 const isHeading = /^(?:[0-9]+\.|\bRECITALS\b|\bPURPOSE\b|\bSOLEMN\b|\bWITNESS\b|\bNOW, THEREFORE\b)/i.test(paragraph.trim());
                 
-                // If paragraph is the signature placeholder block in raw text, we render actual signature cards instead
+                // If paragraph is the signature placeholder block in raw text, we render actual signature cards instead if includeSignatures is true
                 if (paragraph.includes('SIGNATURES:') || paragraph.includes('IN WITNESS WHEREOF') || paragraph.includes('EXECUTED by the parties') || paragraph.includes('SEALED AND ATTESTED')) {
+                  if (!includeSignatures) return null;
                   return (
                     <div key={index} className="pt-4 pb-2">
                       <p
@@ -174,69 +177,76 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
             </div>
           </div>
 
-          {/* Signatures & Execution Section */}
-          <div className="mt-12 pt-8 border-t break-inside-avoid print:mt-6 print:pt-4" style={{ borderColor: `${theme.accentColor}33` }}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 print:grid-cols-3">
-              {signatures.map((sig) => {
-                const hasSignature = !!(sig.signatureData || (sig.type === 'type' && sig.name));
+          {/* Signatures & Execution Section (Conditional based on creator enable/disable toggle) */}
+          {includeSignatures && signatures.length > 0 && (
+            <div className="mt-12 pt-8 border-t break-inside-avoid print:mt-6 print:pt-4" style={{ borderColor: `${theme.accentColor}33` }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 print:grid-cols-3">
+                {signatures.map((sig) => {
+                  const hasSignature = !!(sig.signatureData || (sig.type === 'type' && sig.name));
 
-                return (
-                  <div
-                    key={sig.id}
-                    className="flex flex-col justify-end p-4 rounded-xl border border-dashed border-slate-300 bg-white/60 print:bg-transparent print:border-none print:p-0 transition-all hover:border-indigo-400 group"
-                  >
-                    <div className="min-h-[60px] flex items-end justify-center mb-1 relative">
-                      {sig.signatureData ? (
-                        <img
-                          src={sig.signatureData}
-                          alt={`${sig.label} signature`}
-                          className="max-h-16 max-w-full object-contain mx-auto"
-                        />
-                      ) : sig.name ? (
-                        <p
-                          className="text-2xl text-slate-800 text-center"
-                          style={{ fontFamily: "'Great Vibes', cursive, serif" }}
+                  return (
+                    <div
+                      key={sig.id}
+                      className="flex flex-col justify-end p-4 rounded-xl border border-dashed border-slate-300 bg-white/60 print:bg-transparent print:border-none print:p-0 transition-all hover:border-indigo-400 group"
+                    >
+                      <div className="min-h-[60px] flex items-end justify-center mb-1 relative">
+                        {sig.signatureData ? (
+                          <img
+                            src={sig.signatureData}
+                            alt={`${sig.label} signature`}
+                            className="max-h-16 max-w-full object-contain mx-auto"
+                          />
+                        ) : sig.name ? (
+                          <p
+                            className="text-2xl text-slate-800 text-center"
+                            style={{ fontFamily: "'Great Vibes', cursive, serif" }}
+                          >
+                            {sig.name}
+                          </p>
+                        ) : null}
+
+                        {/* Interactive Sign Button overlay for web UI */}
+                        <button
+                          onClick={() => onOpenSignatureModal(sig)}
+                          className="no-print absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/80 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-opacity shadow-md"
                         >
-                          {sig.name}
+                          <PenTool size={13} /> {hasSignature ? 'Edit Signature' : 'Sign Now'}
+                        </button>
+                      </div>
+
+                      {/* Signature Baseline */}
+                      <div className="border-b-2 border-slate-700 mb-1.5" />
+
+                      <div className="text-center sm:text-left">
+                        <p className="font-bold text-xs text-slate-900 truncate">
+                          {sig.name || '[Name Required]'}
                         </p>
-                      ) : null}
-
-                      {/* Interactive Sign Button overlay for web UI */}
-                      <button
-                        onClick={() => onOpenSignatureModal(sig)}
-                        className="no-print absolute inset-0 opacity-0 group-hover:opacity-100 bg-slate-900/80 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-opacity shadow-md"
-                      >
-                        <PenTool size={13} /> {hasSignature ? 'Edit Signature' : 'Sign Now'}
-                      </button>
-                    </div>
-
-                    {/* Signature Baseline */}
-                    <div className="border-b-2 border-slate-700 mb-1.5" />
-
-                    <div className="text-center sm:text-left">
-                      <p className="font-bold text-xs text-slate-900 truncate">
-                        {sig.name || '[Name Required]'}
-                      </p>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {sig.label}
-                      </p>
-                      {sig.signedDate && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          Signed: {sig.signedDate}
+                        <p className="text-[11px] font-semibold text-indigo-700 truncate">
+                          {sig.title || sig.label}
                         </p>
-                      )}
+                        {sig.label && sig.title && sig.label !== sig.title && (
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {sig.label}
+                          </p>
+                        )}
+                        {sig.signedDate && (
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Signed: {sig.signedDate}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            {/* Document Bottom Authentication Footer */}
-            <div className="mt-8 pt-4 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 gap-2">
-              <span>Covenant Document Security Verification • ID: {Date.now().toString(36).toUpperCase()}</span>
-              <span>Executed with authentic digital attestations</span>
+              {/* Document Bottom Authentication Footer */}
+              <div className="mt-8 pt-4 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 gap-2">
+                <span>Covenant Document Security Verification • ID: {Date.now().toString(36).toUpperCase()}</span>
+                <span>Executed with authentic digital attestations</span>
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>
