@@ -26,3 +26,73 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.7);
 }
+
+/* ==========================================================================
+   PRINT STYLES: Multi-mode Portrait Contracts & Landscape Certificates
+   ========================================================================== */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: #ffffff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Certificate Maker Mode (Landscape single-sheet) */
+  body.certificate-mode {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.certificate-mode .print-area {
+    width: 100vw !important;
+    height: 100vh !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Contract Studio & Polished Industry Standard Mode (Upright Portrait Document) */
+  body.contract-mode {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+  }
+
+  body.contract-mode #contract-print-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Print page breaks & layout */
+  .break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .break-before-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .break-after-page {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+}

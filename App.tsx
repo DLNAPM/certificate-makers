@@ -51,6 +51,17 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Synchronize body class for print orientation (certificate = landscape, contracts = portrait)
+  useEffect(() => {
+    if (appMode === 'contracts') {
+      document.body.classList.add('contract-mode');
+      document.body.classList.remove('certificate-mode');
+    } else {
+      document.body.classList.add('certificate-mode');
+      document.body.classList.remove('contract-mode');
+    }
+  }, [appMode]);
+
   const handleDataChange = useCallback((field: keyof CertificateData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));
   }, []);
@@ -156,6 +167,20 @@ const App: React.FC = () => {
   };
 
   const handlePrint = useCallback(() => {
+    let styleTag = document.getElementById('print-page-orientation') as HTMLStyleElement | null;
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'print-page-orientation';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.innerHTML = `
+      @media print {
+        @page {
+          size: letter landscape !important;
+          margin: 0 !important;
+        }
+      }
+    `;
     window.print();
   }, []);
 

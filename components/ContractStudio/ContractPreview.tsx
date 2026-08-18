@@ -95,11 +95,11 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
   };
 
   return (
-    <div className="w-full flex justify-center py-6 px-2 sm:px-6">
-      {/* Printable Sheet (Letter Aspect Ratio / ~816x1056 or min-h portrait) */}
+    <div className="w-full flex justify-center py-6 px-2 sm:px-6 print:p-0 print:m-0 print:w-full print:block">
+      {/* Printable Sheet (Letter Aspect Ratio / Upright Portrait) */}
       <div
         id="contract-print-sheet"
-        className={`relative w-full max-w-[850px] min-h-[1100px] shadow-2xl p-8 sm:p-14 print:p-8 print:shadow-none print:w-full print:max-w-none print:min-h-0 transition-all ${theme.bgClass}`}
+        className={`relative w-full max-w-[850px] min-h-[1100px] shadow-2xl p-8 sm:p-14 print:p-6 print:m-0 print:shadow-none print:w-full print:max-w-none print:min-h-0 print:bg-white transition-all ${theme.bgClass}`}
         style={{
           backgroundColor: theme.paperColor,
           fontFamily: theme.bodyFont === 'font-serif' ? "'Plus Jakarta Sans', Georgia, serif" : 'inherit'

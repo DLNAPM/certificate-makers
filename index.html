@@ -16,26 +16,12 @@
     <style>
       /* Custom print styles to ensure background graphics are preserved */
       @media print {
-        @page {
-          size: landscape;
-          margin: 0;
-        }
         body {
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
         .no-print {
           display: none !important;
-        }
-        .print-area {
-          width: 100vw;
-          height: 100vh;
-          position: absolute;
-          top: 0;
-          left: 0;
-          margin: 0;
-          border: none;
-          box-shadow: none;
         }
       }
     </style>

@@ -92,6 +92,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [sealSize, setSealSize] = useState<number>(84);
   const [sealEffect, setSealEffect] = useState<SealEffectStyle>('gold_foil');
   const [ribbonColor, setRibbonColor] = useState<'gold' | 'navy' | 'burgundy' | 'emerald' | 'none'>('none');
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   
   // UI states
   const [activeTab, setActiveTab] = useState<'fields' | 'text' | 'style' | 'signatures'>('fields');
@@ -391,8 +392,34 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     }
   };
 
-  // Print contract
+  // Dynamic print orientation stylesheet application (Portrait = Upright 8.5x11, Landscape = Wide)
+  const applyPrintOrientationStyle = useCallback((orientation: 'portrait' | 'landscape') => {
+    let styleTag = document.getElementById('print-page-orientation') as HTMLStyleElement | null;
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'print-page-orientation';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.innerHTML = `
+      @media print {
+        @page {
+          size: letter ${orientation} !important;
+          margin: 12mm 12mm 15mm 12mm !important;
+        }
+      }
+    `;
+  }, []);
+
+  // Update dynamic print style on mount and when orientation changes
+  useEffect(() => {
+    document.body.classList.add('contract-mode');
+    document.body.classList.remove('certificate-mode');
+    applyPrintOrientationStyle(printOrientation);
+  }, [printOrientation, applyPrintOrientationStyle]);
+
+  // Print contract / Export to PDF (Upright Portrait by default - No 90 degree rotation required)
   const handlePrint = () => {
+    applyPrintOrientationStyle(printOrientation);
     window.print();
   };
 
@@ -1309,6 +1336,49 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                       <p className="text-xs font-bold text-slate-800 truncate">{s.name}</p>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Document Orientation & PDF Export Format */}
+              <div className="space-y-3 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800">Print & PDF Export Orientation</h4>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    {printOrientation === 'portrait' ? 'Upright Portrait (Standard)' : 'Landscape (Wide)'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('portrait')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      printOrientation === 'portrait'
+                        ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50/50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3.5 h-5 border-2 border-indigo-600 rounded-xs bg-white"></div>
+                      <p className="text-xs font-bold text-slate-900">Portrait (Upright)</p>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Standard 8.5" × 11" Legal format. Exports upright without rotation.</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('landscape')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      printOrientation === 'landscape'
+                        ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50/50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-5 h-3.5 border-2 border-slate-600 rounded-xs bg-white"></div>
+                      <p className="text-xs font-bold text-slate-900">Landscape</p>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Wide 11" × 8.5" format for wide comparison tables.</p>
+                  </button>
                 </div>
               </div>
 
