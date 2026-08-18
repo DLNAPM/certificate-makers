@@ -3,5 +3,6 @@
   "description": "A beautiful, customizable premarital counseling certificate generator with various backgrounds and elegant typography.",
   "requestFramePermissions": [
     "microphone"
-  ]
+  ],
+  "majorCapabilities": []
 }

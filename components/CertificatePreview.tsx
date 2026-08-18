@@ -32,8 +32,8 @@ const CertificatePreview: React.FC<CertificatePreviewProps> = ({
 
   const handleMouseMove = (e: MouseEvent) => {
     if (dragging) {
-      const newX = e.clientX - offset.x;
-      const newY = e.clientY - offset.y;
+      const newX = Math.round(Math.max(20, Math.min(1056 - layout.signatureWidth - 20, e.clientX - offset.x)));
+      const newY = Math.round(Math.max(100, Math.min(816 - 90, e.clientY - offset.y)));
       
       // Update the specific position in the layout
       onLayoutChange(dragging, { x: newX, y: newY });

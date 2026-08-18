@@ -156,7 +156,7 @@ export const deleteTemplate = async (templateId: string, backgroundUrl?: string)
   }
 };
 
-export type TemplateFilterType = 'public' | 'mine' | 'shared';
+export type TemplateFilterType = 'community' | 'public' | 'mine' | 'shared';
 
 export const fetchTemplates = async (type: TemplateFilterType, user?: UserProfile) => {
   if (!db) return [];

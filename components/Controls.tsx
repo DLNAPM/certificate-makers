@@ -15,6 +15,7 @@ interface ControlsProps {
   onGenerateBackground: (prompt: string) => void;
   isGenerating: boolean;
   onPrint: () => void;
+  onSwitchToContracts: () => void;
   
   // Auth & Cloud Props
   user: UserProfile | null;
@@ -37,6 +38,7 @@ const Controls: React.FC<ControlsProps> = ({
   onGenerateBackground,
   isGenerating,
   onPrint,
+  onSwitchToContracts,
   user,
   onLogin,
   onLogout,
@@ -140,6 +142,17 @@ const Controls: React.FC<ControlsProps> = ({
             >
                 <Save size={14} /> Save Design
             </button>
+        </div>
+
+        {/* Switch to Contract Studio Banner */}
+        <div className="mt-3 pt-3 border-t border-slate-800">
+          <button
+            onClick={onSwitchToContracts}
+            className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow"
+          >
+            <FilePlus size={15} />
+            <span>Create & Fill Contracts (Word/PDF)</span>
+          </button>
         </div>
       </div>
 
