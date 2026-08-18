@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   RotateCcw,
   ArrowLeft,
+  ArrowRight,
   Calendar,
   User,
   MapPin,
@@ -42,6 +43,8 @@ import ContractPreview from './ContractPreview';
 import ContractUploadModal from './ContractUploadModal';
 import SignatureModal from './SignatureModal';
 import ClauseLibraryModal from './ClauseLibraryModal';
+import IndustryPolishModal from './IndustryPolishModal';
+import { PolishResult } from '../../services/polishService';
 
 interface ContractStudioProps {
   user: UserProfile | null;
@@ -72,10 +75,22 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [highlightPlaceholders, setHighlightPlaceholders] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showClauseModal, setShowClauseModal] = useState(false);
+  const [showPolishModal, setShowPolishModal] = useState(false);
   const [activeSignature, setActiveSignature] = useState<ContractSignature | null>(null);
   const [searchField, setSearchField] = useState('');
   const [saveToast, setSaveToast] = useState(false);
+  const [polishSuccessToast, setPolishSuccessToast] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
+
+  // Apply Polished Industry Standard Version
+  const handleApplyPolishedVersion = (result: PolishResult) => {
+    setDocumentTitle(result.polishedTitle);
+    setRawContent(result.polishedContent);
+    
+    // Auto-switch to preview and notify
+    setPolishSuccessToast(`Polished to ${result.standardName}! Incorporated ${result.filledVariablesCount} filled variables.`);
+    setTimeout(() => setPolishSuccessToast(null), 5000);
+  };
   
   // Scan notification state
   const [scanNotification, setScanNotification] = useState<{
@@ -397,10 +412,21 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
           {/* Right: Primary Studio Actions */}
           <div className="flex items-center gap-2">
+            {/* Polish to Industry Standard Button */}
+            <button
+              onClick={() => setShowPolishModal(true)}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
+              title="Produce a more polished, industry-standard version incorporating all filled variables"
+            >
+              <Sparkles size={14} className="text-slate-950" />
+              <span className="hidden sm:inline">Polish to Industry Standard</span>
+              <span className="sm:hidden">Polish Standard</span>
+            </button>
+
             {/* Upload Template Button */}
             <button
               onClick={() => setShowUploadModal(true)}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
               title="Upload MS-Word, PDF, or Text Template file to scan variables"
             >
               <Upload size={14} />
@@ -411,7 +437,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             {/* Print / Export PDF */}
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
+              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
               title="Print to Paper or Save as PDF"
             >
               <Printer size={14} />
@@ -421,7 +447,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             {/* Save Contract */}
             <button
               onClick={handleSaveContract}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-colors"
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
               title="Save Contract Draft"
             >
               <Save size={16} />
@@ -430,6 +456,19 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
         </div>
       </header>
+
+      {/* Polish Success Toast */}
+      {polishSuccessToast && (
+        <div className="fixed bottom-20 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-indigo-500/50 flex items-center gap-3 text-xs font-bold animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="p-1.5 bg-amber-400 text-slate-950 rounded-lg shrink-0">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <p className="text-amber-300 font-extrabold">Industry Standard Applied!</p>
+            <p className="text-slate-300 font-normal text-[11px]">{polishSuccessToast}</p>
+          </div>
+        </div>
+      )}
 
       {/* Save Success Toast */}
       {saveToast && (
@@ -562,6 +601,31 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 <p className="text-[10px] text-slate-500 mt-0.5">
                   Click to browse or drop file to auto-scan and re-generate variables
                 </p>
+              </div>
+
+              {/* Polish to Industry Standard Banner */}
+              <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-indigo-600/15 border border-amber-300/70 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500 text-slate-950 rounded-xl shadow-xs shrink-0">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-black text-slate-900">Industry Standard Polish</h4>
+                      <span className="text-[9px] px-1.5 py-0.2 font-bold bg-amber-400 text-slate-950 rounded">AI Legal Engine</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight mt-0.5">
+                      Transform filled variables into an executive legal agreement or pastoral covenant
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPolishModal(true)}
+                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
+                >
+                  <Sparkles size={12} className="text-amber-400" />
+                  <span>Polish</span>
+                </button>
               </div>
 
               {/* Progress & Quick Action Toolbar */}
@@ -865,6 +929,18 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                   })}
                 </div>
               )}
+
+              {/* Bottom Polish Action Callout */}
+              <div className="pt-2">
+                <button
+                  onClick={() => setShowPolishModal(true)}
+                  className="w-full p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all hover:shadow-lg cursor-pointer group"
+                >
+                  <Sparkles size={15} className="text-amber-400 group-hover:rotate-12 transition-transform" />
+                  <span>Produce Polished Industry Standard Version</span>
+                  <ArrowRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
 
             </div>
           )}
@@ -1211,6 +1287,15 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             </div>
             <div className="flex items-center gap-3">
               <button
+                onClick={() => setShowPolishModal(true)}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border bg-amber-50 text-slate-950 border-amber-300 hover:bg-amber-100 cursor-pointer shadow-2xs"
+                title="Produce a more polished industry standard version"
+              >
+                <Sparkles size={12} className="text-amber-600" />
+                <span>Polish to Industry Standard</span>
+              </button>
+
+              <button
                 onClick={() => setIncludeSignatures(!includeSignatures)}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border ${
                   includeSignatures
@@ -1256,6 +1341,18 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
         <ClauseLibraryModal
           onInsertClause={handleInsertClause}
           onClose={() => setShowClauseModal(false)}
+        />
+      )}
+
+      {showPolishModal && (
+        <IndustryPolishModal
+          documentTitle={documentTitle}
+          rawContent={rawContent}
+          fields={fields}
+          signatures={signatures}
+          includeSignatures={includeSignatures}
+          onApplyPolishedVersion={handleApplyPolishedVersion}
+          onClose={() => setShowPolishModal(false)}
         />
       )}
 

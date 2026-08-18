@@ -180,7 +180,7 @@ export const fetchTemplates = async (type: TemplateFilterType, user?: UserProfil
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
+      ...(doc.data() as object)
     })) as SavedTemplate[];
   } catch (error: any) {
     console.error("Error fetching templates:", error);
@@ -191,7 +191,9 @@ export const fetchTemplates = async (type: TemplateFilterType, user?: UserProfil
       if (type === 'shared' && user && user.email) {
          const simpleQ = query(templatesRef, where("sharedWith", "array-contains", user.email));
          const snap = await getDocs(simpleQ);
-         return snap.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a,b) => b.createdAt - a.createdAt) as SavedTemplate[];
+         return snap.docs
+           .map(doc => ({ id: doc.id, ...(doc.data() as object) } as SavedTemplate))
+           .sort((a, b) => ((b.createdAt || 0) as number) - ((a.createdAt || 0) as number));
       }
     }
     throw error;
