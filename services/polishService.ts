@@ -5,7 +5,10 @@ export type IndustryStandardType =
   | 'executive_legal'
   | 'pastoral_covenant'
   | 'plain_english_business'
-  | 'formal_attestation';
+  | 'formal_attestation'
+  | 'docusign_legal';
+
+export type DocuSignExecutionMode = 'standard_lines' | 'anchor_tags';
 
 export interface PolishOptions {
   title: string;
@@ -15,6 +18,8 @@ export interface PolishOptions {
   includeSignatures: boolean;
   standardType: IndustryStandardType;
   customInstructions?: string;
+  docuSignMode?: DocuSignExecutionMode;
+  includeDocuSignClause?: boolean;
 }
 
 export interface PolishResult {
@@ -28,6 +33,7 @@ export interface PolishResult {
   standardName: string;
   filledVariablesCount: number;
   totalVariablesCount: number;
+  docuSignMode?: DocuSignExecutionMode;
 }
 
 export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
@@ -36,6 +42,17 @@ export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
   description: string;
   features: string[];
 }> = {
+  docusign_legal: {
+    name: 'DocuSign e-Sign Legal Standard',
+    tagline: 'ESIGN & UETA compliant, signature & date ready',
+    description: 'Formatted specifically for seamless electronic signature routing (DocuSign, Adobe Sign, PandaDoc). Eliminates manual field friction; parties involved only need to sign their names and enter their signature dates.',
+    features: [
+      'DocuSign & ESIGN Act counterpart enforceability clause',
+      'Designated signature and signing date lines only',
+      'Pre-filled legal party identifications & roles',
+      'Optional DocuSign auto-place anchor tags (/s1/, /d1/)'
+    ]
+  },
   executive_legal: {
     name: 'Executive Legal Standard',
     tagline: 'Comprehensive, formally structured legal agreement',
@@ -44,7 +61,7 @@ export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
       'Formal WHEREAS recitals & consideration statements',
       'Numbered hierarchical sections (1.0, 1.1...)',
       'Standard dispute resolution & governing law clauses',
-      'Severability and entire agreement protections'
+      'DocuSign-ready execution & electronic attestation'
     ]
   },
   pastoral_covenant: {
@@ -55,7 +72,7 @@ export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
       'Solemn covenant declarations & preamble',
       'Mutual commitments & counseling ethics',
       'Pastoral confidentiality & support framework',
-      'Ceremonial blessing & formal attestations'
+      'DocuSign-ready signature & signing date blocks'
     ]
   },
   plain_english_business: {
@@ -66,7 +83,7 @@ export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
       'Direct, readable active-voice commitments',
       'Streamlined modern section structure',
       'Unambiguous deliverables and mutual rights',
-      'Clean modern signature attestation'
+      'Clean electronic sign & date attestation'
     ]
   },
   formal_attestation: {
@@ -77,10 +94,107 @@ export const INDUSTRY_STANDARDS_INFO: Record<IndustryStandardType, {
       'Formal declaration of truth & completion',
       'Witness attestation & certification block',
       'Permanent record & archival affirmation',
-      'Verification authority seal formatting'
+      'DocuSign signature and date confirmation'
     ]
   }
 };
+
+/**
+ * Builds a standardized DocuSign-compliant execution section where signers
+ * only need to sign their names and enter their signature dates.
+ */
+export function buildDocuSignExecutionSection(
+  fields: ContractField[],
+  signatures: ContractSignature[],
+  mode: DocuSignExecutionMode = 'standard_lines'
+): string {
+  const isAnchor = mode === 'anchor_tags';
+
+  // Extract party names with smart fallbacks
+  const party1Field = fields.find(f => 
+    f.label.toLowerCase().includes('bride') || 
+    f.label.toLowerCase().includes('party 1') || 
+    f.label.toLowerCase().includes('client 1') || 
+    f.label.toLowerCase().includes('first party') ||
+    f.key.toLowerCase().includes('bride') ||
+    f.key.toLowerCase().includes('spouse1')
+  );
+  const party1 = (party1Field?.value && party1Field.value.trim()) || 
+    signatures.find(s => s.role === 'bride' || s.id.includes('party1'))?.name || 
+    'First Party / Client 1';
+
+  const party2Field = fields.find(f => 
+    f.label.toLowerCase().includes('groom') || 
+    f.label.toLowerCase().includes('party 2') || 
+    f.label.toLowerCase().includes('client 2') || 
+    f.label.toLowerCase().includes('second party') ||
+    f.key.toLowerCase().includes('groom') ||
+    f.key.toLowerCase().includes('spouse2')
+  );
+  const party2 = (party2Field?.value && party2Field.value.trim()) || 
+    signatures.find(s => s.role === 'groom' || s.id.includes('party2'))?.name || 
+    'Second Party / Client 2';
+
+  const counselorField = fields.find(f => 
+    f.label.toLowerCase().includes('counselor') || 
+    f.label.toLowerCase().includes('officiant') || 
+    f.label.toLowerCase().includes('pastor') ||
+    f.label.toLowerCase().includes('minister') ||
+    f.key.toLowerCase().includes('counselor')
+  );
+  const counselor = (counselorField?.value && counselorField.value.trim()) || 
+    signatures.find(s => s.role === 'counselor')?.name || 
+    'Counselor / Officiant / Presiding Authority';
+
+  const witness1Field = fields.find(f => f.key.toLowerCase().includes('witness1') || f.label.toLowerCase().includes('witness 1'));
+  const witness1 = (witness1Field?.value && witness1Field.value.trim()) || signatures.find(s => s.role === 'witness1')?.name || '';
+
+  const witness2Field = fields.find(f => f.key.toLowerCase().includes('witness2') || f.label.toLowerCase().includes('witness 2'));
+  const witness2 = (witness2Field?.value && witness2Field.value.trim()) || signatures.find(s => s.role === 'witness2')?.name || '';
+
+  let section = `SECTION — EXECUTION, COUNTERPARTS & ELECTRONIC SIGNATURES
+IN WITNESS WHEREOF, the Parties hereto have caused this Agreement to be duly executed by their electronic or handwritten signatures below, effective as of the date of the last signature affixed hereto.
+
+This Agreement may be executed in any number of counterparts, each of which shall be deemed an original, and all of which together shall constitute one and the same legal instrument. Delivery of an executed counterpart via electronic signature technologies (including DocuSign, Adobe Sign, or secure PDF e-signature) shall be legally binding and enforceable with the same validity and effect as a manually executed handwritten original, in accordance with the U.S. Electronic Signatures in Global and National Commerce Act (ESIGN Act, 15 U.S.C. § 7001 et seq.) and the Uniform Electronic Transactions Act (UETA).
+
+The parties involved are only required to sign their names and enter the date of their signatures:
+
+PARTY 1 / CLIENT:
+${isAnchor ? 'Signature: /s1/ ____________________________________________________' : 'Signature: ________________________________________________________'}
+Signer Name: ${party1}
+Title / Capacity: Authorized Party 1 Signatory
+${isAnchor ? 'Date of Signature: /d1/ ____________________________________________' : 'Date of Signature: ________________________________________________'}
+
+PARTY 2 / CLIENT:
+${isAnchor ? 'Signature: /s2/ ____________________________________________________' : 'Signature: ________________________________________________________'}
+Signer Name: ${party2}
+Title / Capacity: Authorized Party 2 Signatory
+${isAnchor ? 'Date of Signature: /d2/ ____________________________________________' : 'Date of Signature: ________________________________________________'}
+
+COUNSELOR / OFFICIANT / ATTESTING AUTHORITY:
+${isAnchor ? 'Signature: /s3/ ____________________________________________________' : 'Signature: ________________________________________________________'}
+Signer Name: ${counselor}
+Title / Capacity: Presiding Pastoral Counselor / Officiant
+${isAnchor ? 'Date of Signature: /d3/ ____________________________________________' : 'Date of Signature: ________________________________________________'}`;
+
+  if (witness1) {
+    section += `\n\nWITNESS 1 ATTESTATION:
+${isAnchor ? 'Signature: /s4/ ____________________________________________________' : 'Signature: ________________________________________________________'}
+Signer Name: ${witness1}
+Title / Capacity: Official Witness
+${isAnchor ? 'Date of Signature: /d4/ ____________________________________________' : 'Date of Signature: ________________________________________________'}`;
+  }
+
+  if (witness2) {
+    section += `\n\nWITNESS 2 ATTESTATION:
+${isAnchor ? 'Signature: /s5/ ____________________________________________________' : 'Signature: ________________________________________________________'}
+Signer Name: ${witness2}
+Title / Capacity: Official Witness
+${isAnchor ? 'Date of Signature: /d5/ ____________________________________________' : 'Date of Signature: ________________________________________________'}`;
+  }
+
+  return section;
+}
 
 /**
  * Replaces placeholders with their filled values or formatted fallback in text.
@@ -180,8 +294,45 @@ function generateLocalIndustryStandardPolish(options: PolishOptions): PolishResu
   const protections: string[] = [];
 
   enhancements.push('Cleaned formatting: removed unnecessary asterisks and normalized typographical hierarchy');
+  enhancements.push("DocuSign Integration: Formatted signature blocks so parties only need to sign their names and enter their signature dates");
+  protections.push('DocuSign & ESIGN Act Electronic Execution Validity Standard');
 
-  if (standardType === 'executive_legal') {
+  const docusignExecution = buildDocuSignExecutionSection(fields, signatures, options.docuSignMode || 'standard_lines');
+
+  if (standardType === 'docusign_legal') {
+    enhancements.push('Optimized for DocuSign e-Sign execution (only name signature & date required)');
+    enhancements.push('Integrated ESIGN Act & UETA electronic signature enforceability covenants');
+    enhancements.push('Structured clear, binding operative terms with pre-filled party roles');
+    protections.push('Counterparts & Digital Audit Trail Recognition');
+    protections.push('Mutual Confidentiality & Good Faith Performance');
+
+    polishedBody = `ELECTRONIC COVENANT & LEGAL AGREEMENT
+Effective Date: ${dateVal}
+
+PARTIES ENTERING THIS AGREEMENT:
+  • PARTY 1 / CLIENT 1: ${party1}
+  • PARTY 2 / CLIENT 2: ${party2}
+  ${authority !== 'Presiding Authority' ? `• FACILITATING AUTHORITY: ${authority}\n` : ''}
+RECITALS & PURPOSE
+WHEREAS, the Parties wish to record and finalize their mutual promises, covenants, and foundational commitments in a legally binding and enforceable electronic record; and
+
+WHEREAS, the Parties have completed all preparatory dialogue and agree to all terms set forth herein;
+
+NOW, THEREFORE, the Parties mutually agree to the following terms:
+
+SECTION 1.0 — OPERATIVE COMMITMENTS & TERMS
+${cleanAndFormatContractText(substituted).trim()}
+
+SECTION 2.0 — MUTUAL COOPERATION & RESOLUTION
+2.1 Good Faith Performance. Each Party agrees to fulfill their mutual obligations with utmost honesty, respect, and good faith.
+2.2 Amicable Resolution. In case of any dispute or misunderstanding, the Parties commit to engaging in direct, respectful dialogue or consulting a designated mediator or counselor prior to taking any formal dispute actions.
+
+SECTION 3.0 — SEVERABILITY & FULL UNDERSTANDING
+3.1 Full Understanding. This document represents the full, integrated agreement of the Parties and supersedes all prior verbal discussions.
+3.2 Severability. If any individual clause is determined to be invalid, the remaining terms shall continue in full force and effect.
+
+${docusignExecution}`;
+  } else if (standardType === 'executive_legal') {
     enhancements.push('Structured with formal WHEREAS recitals and legal consideration');
     enhancements.push('Organized into standardized numbered legal sections (1.0 - 6.0)');
     enhancements.push('Integrated comprehensive Severability and Governing Law protections');
@@ -218,8 +369,7 @@ SECTION 5.0 — SEVERABILITY & ENTIRE AGREEMENT
 5.1 Severability. If any provision of this Agreement is held to be invalid or unenforceable, the remaining provisions shall continue in full force and effect.
 5.2 Entire Agreement. This Agreement constitutes the complete and finalized understanding between the Parties regarding the subject matter hereof, superseding all prior oral or written representations.
 
-SECTION 6.0 — ELECTRONIC & PHYSICAL ATTESTATION
-6.1 Counterparts & Attestation. This Agreement may be executed in counterparts, each of which shall be deemed an original, and all of which together shall constitute one and the same instrument.`;
+${docusignExecution}`;
   } else if (standardType === 'pastoral_covenant') {
     enhancements.push('Drafted in solemn, dignified pastoral covenant language');
     enhancements.push('Incorporated marital fidelity, spiritual foundations, and mutual support clauses');
@@ -248,7 +398,9 @@ ARTICLE II — CONTINUED GROWTH & PASTORAL SUPPORT
 2. In times of challenge, the Parties commit to seeking timely pastoral counseling, spiritual mentorship, and constructive guidance.
 
 ARTICLE III — SOLEMN AFFIRMATION
-We, the undersigned, joyfully and reverently enter into this Covenant, pledging our honor, our love, and our devotion to one another.`;
+We, the undersigned, joyfully and reverently enter into this Covenant, pledging our honor, our love, and our devotion to one another.
+
+${docusignExecution}`;
   } else if (standardType === 'plain_english_business') {
     enhancements.push('Refactored into clear, direct, modern plain English');
     enhancements.push('Eliminated archaic legalese while preserving complete clarity');
@@ -277,7 +429,9 @@ Both parties agree to treat each other with dignity, respect private disclosures
 If any disagreements arise, both parties agree to pause, talk through the matter constructively, and seek facilitator or counseling guidance if needed.
 
 5. Final Agreement
-This document represents our full and shared agreement. Any future changes will be agreed upon in writing by all parties.`;
+This document represents our full and shared agreement. Any future changes will be agreed upon in writing by all parties.
+
+${docusignExecution}`;
   } else {
     // Formal Attestation
     enhancements.push('Drafted as a formal record of completion and attestation');
@@ -300,7 +454,9 @@ RECORD OF COVENANTS & FINDINGS:
 ${cleanAndFormatContractText(substituted).trim()}
 
 ATTESTATION & AFFIRMATION:
-The undersigned hereby certify that the statements and covenants recorded herein are true, accurate, and entered into with full mutual consent.`;
+The undersigned hereby certify that the statements and covenants recorded herein are true, accurate, and entered into with full mutual consent.
+
+${docusignExecution}`;
   }
 
   return {
@@ -313,7 +469,8 @@ The undersigned hereby certify that the statements and covenants recorded herein
     standardType,
     standardName: standardInfo.name,
     filledVariablesCount: filledCount,
-    totalVariablesCount: fields.length
+    totalVariablesCount: fields.length,
+    docuSignMode: options.docuSignMode || 'standard_lines'
   };
 }
 
@@ -322,7 +479,7 @@ The undersigned hereby certify that the statements and covenants recorded herein
  * Falls back gracefully to intelligent local standardizer if key is unavailable or request fails.
  */
 export async function polishContractWithAI(options: PolishOptions): Promise<PolishResult> {
-  const { title, rawContent, fields, signatures, standardType, customInstructions } = options;
+  const { title, rawContent, fields, signatures, standardType, customInstructions, docuSignMode } = options;
   const standardInfo = INDUSTRY_STANDARDS_INFO[standardType];
   const filledCount = fields.filter(f => f.value && f.value.trim().length > 0).length;
 
@@ -369,25 +526,38 @@ export async function polishContractWithAI(options: PolishOptions): Promise<Poli
       }))
     );
 
-    const systemInstruction = `You are a Senior Legal Counsel and Pastoral Covenant Drafting Specialist.
-Your task is to take a draft contract or covenant template that has had its variables filled in, and produce a more Polished, Industry-Standard version.
+    const useAnchorTags = docuSignMode === 'anchor_tags';
+
+    const systemInstruction = `You are a Senior Legal Counsel and Contract Drafting Specialist specializing in DocuSign and Electronic Signature standards (ESIGN Act & UETA).
+Your task is to take a draft contract or covenant template with filled variables, and produce a Polished, Industry-Standard version ready for electronic execution via DocuSign.
 
 Rules:
-1. PRESERVE ALL USER INPUTS: Every filled value (names, dates, amounts, locations, specific promises) MUST be seamlessly and accurately incorporated into the polished text.
+1. PRESERVE ALL USER INPUTS: Every filled value (names, dates, amounts, locations, specific promises) MUST be seamlessly incorporated into the polished agreement body.
 2. ADAPT TO SELECTED STANDARD:
-   - "executive_legal": Formal legal agreement with WHEREAS recitals, numbered hierarchical sections (1.0, 1.1...), standard dispute resolution, severability, confidentiality, and execution terms.
-   - "pastoral_covenant": Solemn, dignified premarital/marital/counseling covenant with spiritual/ethical gravity, mutual commitments, pastoral care, and affirmation.
-   - "plain_english_business": Crystal-clear, modern, readable provisions with zero archaic clutter, transparent mutual duties, and straightforward remedies.
-   - "formal_attestation": Formal sworn affidavit/certificate of completion with record of covenants, witness affirmation, and authentic seal block.
-3. FORMATTING & CLEANLINESS (CRITICAL):
+   - "docusign_legal": Formal legal agreement formatted specifically for DocuSign/electronic signature routing where parties only need to sign their names and enter the date of their signatures.
+   - "executive_legal": Formal legal agreement with WHEREAS recitals, numbered hierarchical sections (1.0, 1.1...), standard dispute resolution, and DocuSign execution block.
+   - "pastoral_covenant": Solemn, dignified premarital/marital/counseling covenant with spiritual/ethical gravity and DocuSign signature block.
+   - "plain_english_business": Crystal-clear, modern, readable provisions with straightforward remedies and DocuSign execution block.
+   - "formal_attestation": Formal sworn affidavit/certificate of completion with record of covenants and DocuSign execution block.
+3. DOCUSIGN E-SIGNATURE STANDARD (MANDATORY):
+   - The document MUST conclude with an EXECUTION, COUNTERPARTS & ELECTRONIC SIGNATURES section compliant with the ESIGN Act (15 U.S.C. § 7001) and UETA.
+   - For every party involved (Party 1, Party 2, Counselor/Officiant, and any Witnesses), create standardized signature blocks where parties ONLY need to sign their names and enter their signature dates.
+   - Format:
+     PARTY 1 / CLIENT:
+     Signature: ${useAnchorTags ? '/s1/ ' : ''}________________________________________________________
+     Signer Name: [Full Legal Name]
+     Title / Capacity: Authorized Signatory
+     Date of Signature: ${useAnchorTags ? '/d1/ ' : ''}________________________________________________
+   - All parties only need to sign their names and enter the date of their signatures. Do not leave un-filled body fields in the signature area.
+4. FORMATTING & CLEANLINESS (CRITICAL):
    - NO MARKDOWN ASTERISKS: Do NOT use asterisks (* or **) anywhere in the document text. Never output **bold**, *italics*, or * list items.
    - Clean Typography: Use clean standard UPPERCASE lettering for major section titles (e.g., 'SECTION 1.0 — PURPOSE AND SCOPE', 'ARTICLE I — MUTUAL COVENANTS', 'WHEREAS,', 'NOW, THEREFORE,').
    - Clean Numbering: Use clean numbering format (e.g., '1.1 Mutual Honor & Respect.', '1.2 Good Faith Participation.').
    - Clean Bullet Points: Use standard bullet characters ('  • ') for rosters and items.
    - Clean Paragraphs: Separate clauses and sections with clean blank lines.
-4. PURE TEXT ONLY: Do NOT output HTML tags or code fences. Return a clean JSON object according to the response schema.`;
+5. PURE TEXT ONLY: Do NOT output HTML tags or code fences. Return a clean JSON object according to the response schema.`;
 
-    const promptText = `Please polish and standardize the following contract document to the "${standardInfo.name}" (${standardType}).
+    const promptText = `Please polish and standardize the following contract document to the "${standardInfo.name}" (${standardType}) with full DocuSign e-sign integration.
 Ensure ALL asterisks are completely removed and the typography is pure, clean, and publication-ready.
 
 Original Document Title: ${title}
@@ -398,6 +568,8 @@ ${filledVariablesJson}
 Signature Blocks Data:
 ${signaturesJson}
 
+DocuSign Tag Mode: ${docuSignMode || 'standard_lines'}
+
 Original Template Text:
 """
 ${rawContent}
@@ -405,7 +577,7 @@ ${rawContent}
 
 ${customInstructions ? `Additional User Instructions: "${customInstructions}"` : ''}
 
-Generate a comprehensive, beautifully drafted, professional industry-standard version with zero markdown asterisks.`;
+Generate a comprehensive, beautifully drafted, professional industry-standard version with DocuSign execution block and zero markdown asterisks.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -423,7 +595,7 @@ Generate a comprehensive, beautifully drafted, professional industry-standard ve
             },
             polishedContent: {
               type: Type.STRING,
-              description: 'The complete, fully drafted, polished industry-standard contract text incorporating all filled variables with zero asterisks.'
+              description: 'The complete, fully drafted, polished industry-standard contract text incorporating all filled variables and DocuSign signature & date blocks with zero asterisks.'
             },
             summaryOfEnhancements: {
               type: Type.ARRAY,
@@ -444,16 +616,25 @@ Generate a comprehensive, beautifully drafted, professional industry-standard ve
     const responseText = response.text;
     if (responseText) {
       const parsed = JSON.parse(responseText);
-      const cleanedPolishedContent = cleanAndFormatContractText(parsed.polishedContent || rawContent);
+      let cleanedPolishedContent = cleanAndFormatContractText(parsed.polishedContent || rawContent);
       const cleanedPolishedTitle = cleanAndFormatContractText(parsed.polishedTitle || title);
+
+      // Ensure DocuSign execution block is present
+      if (!cleanedPolishedContent.includes('Signature:') && !cleanedPolishedContent.includes('Date of Signature:')) {
+        cleanedPolishedContent += `\n\n${buildDocuSignExecutionSection(fields, signatures, docuSignMode || 'standard_lines')}`;
+      }
 
       const returnedEnhancements: string[] = parsed.summaryOfEnhancements || [
         'Standardized document hierarchy and clause structure',
+        'DocuSign Integration: Parties only need to sign names and enter signature dates',
         'Incorporated filled variables seamlessly',
         'Enhanced enforceability and clarity'
       ];
       
-      // Ensure clean formatting enhancement is acknowledged
+      // Ensure DocuSign & clean formatting enhancements are acknowledged
+      if (!returnedEnhancements.some(e => e.toLowerCase().includes('docusign') || e.toLowerCase().includes('sign'))) {
+        returnedEnhancements.unshift('DocuSign e-Sign Integration: Prepared for instant signing of names & dates');
+      }
       if (!returnedEnhancements.some(e => e.toLowerCase().includes('asterisk') || e.toLowerCase().includes('clean'))) {
         returnedEnhancements.unshift('Removed unnecessary markdown asterisks & standardized clean typography');
       }
@@ -465,13 +646,15 @@ Generate a comprehensive, beautifully drafted, professional industry-standard ve
         polishedContent: cleanedPolishedContent,
         summaryOfEnhancements: returnedEnhancements,
         keyProtectionsAdded: parsed.keyProtectionsAdded || [
+          'DocuSign & ESIGN Act Electronic Execution Standard',
           'Confidentiality & Mutual Care Safeguards',
           'Dispute Resolution & Severability'
         ],
         standardType,
         standardName: standardInfo.name,
         filledVariablesCount: filledCount,
-        totalVariablesCount: fields.length
+        totalVariablesCount: fields.length,
+        docuSignMode: docuSignMode || 'standard_lines'
       };
     }
   } catch (error) {
