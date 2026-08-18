@@ -25,7 +25,8 @@ import {
   IndustryStandardType,
   INDUSTRY_STANDARDS_INFO,
   PolishResult,
-  polishContractWithAI
+  polishContractWithAI,
+  cleanAndFormatContractText
 } from '../../services/polishService';
 
 interface IndustryPolishModalProps {
@@ -53,6 +54,7 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
   const [polishResult, setPolishResult] = useState<PolishResult | null>(null);
   const [viewTab, setViewTab] = useState<'comparison' | 'polished' | 'original'>('comparison');
   const [isCopied, setIsCopied] = useState(false);
+  const [isCleanedNotice, setIsCleanedNotice] = useState(false);
   const [editablePolishedContent, setEditablePolishedContent] = useState('');
 
   const filledCount = fields.filter(f => f.value && f.value.trim().length > 0).length;
@@ -71,8 +73,13 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
         standardType: selectedStandard,
         customInstructions: customNotes.trim() || undefined
       });
-      setPolishResult(result);
-      setEditablePolishedContent(result.polishedContent);
+      const cleanContent = cleanAndFormatContractText(result.polishedContent);
+      setPolishResult({
+        ...result,
+        polishedContent: cleanContent,
+        polishedTitle: cleanAndFormatContractText(result.polishedTitle)
+      });
+      setEditablePolishedContent(cleanContent);
       setViewTab('comparison');
     } catch (err) {
       console.error('Failed to polish contract:', err);
@@ -81,19 +88,30 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
     }
   };
 
+  const handleCleanAsterisks = () => {
+    const cleaned = cleanAndFormatContractText(editablePolishedContent);
+    setEditablePolishedContent(cleaned);
+    setIsCleanedNotice(true);
+    setTimeout(() => setIsCleanedNotice(false), 2500);
+  };
+
   const handleApply = () => {
     if (polishResult) {
+      const finalCleanContent = cleanAndFormatContractText(editablePolishedContent);
+      const finalCleanTitle = cleanAndFormatContractText(polishResult.polishedTitle);
       onApplyPolishedVersion({
         ...polishResult,
-        polishedContent: editablePolishedContent
+        polishedTitle: finalCleanTitle,
+        polishedContent: finalCleanContent
       });
       onClose();
     }
   };
 
   const handleCopy = () => {
-    if (editablePolishedContent || polishResult?.polishedContent) {
-      navigator.clipboard.writeText(editablePolishedContent || polishResult!.polishedContent);
+    const textToCopy = cleanAndFormatContractText(editablePolishedContent || polishResult?.polishedContent || '');
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
@@ -385,6 +403,19 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
 
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={handleCleanAsterisks}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                      isCleanedNotice 
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                    }`}
+                    title="Remove any residual markdown asterisks and standardize spacing"
+                  >
+                    <Wand2 size={13} className={isCleanedNotice ? 'text-white' : 'text-amber-700'} />
+                    <span>{isCleanedNotice ? 'Asterisks Removed!' : 'Clean Formatting & Asterisks'}</span>
+                  </button>
+
+                  <button
                     onClick={handleCopy}
                     className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
                   >
@@ -411,10 +442,13 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
                   {/* Polished version */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
-                      <span className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <Sparkles size={13} className="text-indigo-600" />
-                        Polished Industry Standard
-                      </span>
+                        <span>Polished Industry Standard</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                          Clean Typography (No Asterisks)
+                        </span>
+                      </div>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
                         {polishResult.standardName}
                       </span>
@@ -430,7 +464,7 @@ const IndustryPolishModal: React.FC<IndustryPolishModalProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                     <span>You can edit this polished draft directly before applying:</span>
-                    <span className="text-[11px] text-slate-500 font-normal">All edits will carry over to document preview</span>
+                    <span className="text-[11px] text-emerald-700 font-bold">Clean Typography • Asterisk-Free</span>
                   </div>
                   <textarea
                     value={editablePolishedContent}

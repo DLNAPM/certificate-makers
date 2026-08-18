@@ -99,6 +99,62 @@ function substituteFilledFields(content: string, fields: ContractField[]): strin
 }
 
 /**
+ * Strips all unnecessary markdown asterisks (*, **, ***) and pseudo-markdown artifacts,
+ * normalizes headers, cleans bullet points to Unicode bullets (•), and cleans line spacing.
+ */
+export function cleanAndFormatContractText(content: string): string {
+  if (!content) return '';
+
+  let cleaned = content;
+
+  // 1. Remove markdown horizontal rules (e.g. ***, ---, ___ or * * *)
+  cleaned = cleaned.replace(/^[ \t]*(\*|\-|_){3,}[ \t]*$/gm, '\n');
+
+  // 2. Remove triple asterisks (bold italic) -> pure text
+  cleaned = cleaned.replace(/\*{3}([^\*\n\r]+)\*{3}/g, '$1');
+
+  // 3. Remove double asterisks (bold) -> pure text
+  cleaned = cleaned.replace(/\*{2}([^\*\n\r]+)\*{2}/g, '$1');
+
+  // 4. Remove single asterisks (italics or loose emphasis) -> pure text
+  cleaned = cleaned.replace(/\*([^\*\n\r]+)\*/g, '$1');
+
+  // 5. Remove markdown headers (#, ##, ###, ####)
+  cleaned = cleaned.replace(/^[ \t]*#{1,6}[ \t]+([^\n\r]+)/gm, (_, heading) => {
+    return heading.trim().toUpperCase();
+  });
+
+  // 6. Convert asterisk or hyphen list markers into clean bullet characters
+  cleaned = cleaned.replace(/^[ \t]*[\*\-][ \t]+([^\n\r]+)/gm, '  • $1');
+
+  // 7. Remove any remaining stray isolated asterisks
+  cleaned = cleaned.replace(/\\\*/g, '');
+  cleaned = cleaned.replace(/\*{1,}/g, '');
+
+  // 8. Clean up double underscore bolding (e.g. __Text__ -> Text), but preserve fill-in underlines (e.g. ________)
+  cleaned = cleaned.replace(/__([^_ \n\r][^_\n\r]*?)__/g, '$1');
+
+  // 9. Standardize section headers spacing & formatting (e.g. "SECTION 1.0 : " -> "SECTION 1.0 — ")
+  cleaned = cleaned.replace(/^([ \t]*(?:SECTION|ARTICLE|CLAUSE)\s+[0-9A-Z\.]+)\s*[:\-—]\s*/gim, '$1 — ');
+
+  // 10. Clean up space before colons (e.g., "Party A :" -> "Party A:")
+  cleaned = cleaned.replace(/([A-Za-z0-9\)])\s+:(?=\s|$)/g, '$1:');
+
+  // 11. Normalize multiple blank lines (max 2 consecutive newlines)
+  cleaned = cleaned.replace(/\r\n/g, '\n');
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // 12. Trim each line's trailing whitespace
+  cleaned = cleaned
+    .split('\n')
+    .map(line => line.trimEnd())
+    .join('\n')
+    .trim();
+
+  return cleaned;
+}
+
+/**
  * Intelligent Local Rule-Based Legal Standardizer fallback
  */
 function generateLocalIndustryStandardPolish(options: PolishOptions): PolishResult {
@@ -108,7 +164,7 @@ function generateLocalIndustryStandardPolish(options: PolishOptions): PolishResu
   const filledCount = fields.filter(f => f.value && f.value.trim().length > 0).length;
   const standardInfo = INDUSTRY_STANDARDS_INFO[standardType];
 
-  let polishedTitle = title;
+  let polishedTitle = cleanAndFormatContractText(title);
   if (!polishedTitle.toUpperCase().includes('AGREEMENT') && !polishedTitle.toUpperCase().includes('COVENANT') && !polishedTitle.toUpperCase().includes('CONTRACT')) {
     polishedTitle = `${polishedTitle.trim()} Agreement`;
   }
@@ -122,6 +178,8 @@ function generateLocalIndustryStandardPolish(options: PolishOptions): PolishResu
   let polishedBody = '';
   const enhancements: string[] = [];
   const protections: string[] = [];
+
+  enhancements.push('Cleaned formatting: removed unnecessary asterisks and normalized typographical hierarchy');
 
   if (standardType === 'executive_legal') {
     enhancements.push('Structured with formal WHEREAS recitals and legal consideration');
@@ -148,7 +206,7 @@ SECTION 1.0 — PURPOSE & FOUNDATIONAL COMMITMENT
 1.2 Good Faith Execution. Each Party covenants to act in good faith and with due diligence in fulfilling every duty and expectation outlined in this instrument.
 
 SECTION 2.0 — OPERATIVE COVENANTS & TERMS
-${substituted.trim()}
+${cleanAndFormatContractText(substituted).trim()}
 
 SECTION 3.0 — CONFIDENTIALITY & MUTUAL PRIVACY
 3.1 Protection of Private Matters. All counseling discussions, personal disclosures, and private communications shared in connection with this Agreement shall be maintained in strict confidence, preserving mutual dignity and psychological safety.
@@ -182,14 +240,14 @@ SACRED PREAMBLE:
 "Let love and faithfulness never leave you; bind them around your neck, write them on the tablet of your heart."
 Having completed the preparatory counseling journey, the Parties enter into this sacred covenant with sincere hearts, deliberate purpose, and unwavering dedication.
 
-ARTICLE I: MUTUAL COVENANTS & RESPONSIBILITIES
-${substituted.trim()}
+ARTICLE I — MUTUAL COVENANTS & RESPONSIBILITIES
+${cleanAndFormatContractText(substituted).trim()}
 
-ARTICLE II: CONTINUED GROWTH & PASTORAL SUPPORT
+ARTICLE II — CONTINUED GROWTH & PASTORAL SUPPORT
 1. The Parties pledge to maintain honest, empathetic, and forgiving communication.
 2. In times of challenge, the Parties commit to seeking timely pastoral counseling, spiritual mentorship, and constructive guidance.
 
-ARTICLE III: SOLEMN AFFIRMATION
+ARTICLE III — SOLEMN AFFIRMATION
 We, the undersigned, joyfully and reverently enter into this Covenant, pledging our honor, our love, and our devotion to one another.`;
   } else if (standardType === 'plain_english_business') {
     enhancements.push('Refactored into clear, direct, modern plain English');
@@ -202,15 +260,15 @@ We, the undersigned, joyfully and reverently enter into this Covenant, pledging 
 Effective Date: ${dateVal}
 
 Parties:
-• ${party1}
-• ${party2}
-• Facilitator / Authority: ${authority}
+  • ${party1}
+  • ${party2}
+  • Facilitator / Authority: ${authority}
 
 1. What This Agreement Is About
 The purpose of this document is to clearly state the commitments, expectations, and agreements reached by the parties.
 
 2. Agreed Terms and Commitments
-${substituted.trim()}
+${cleanAndFormatContractText(substituted).trim()}
 
 3. Privacy & Mutual Respect
 Both parties agree to treat each other with dignity, respect private disclosures, and work through challenges with transparent communication.
@@ -232,14 +290,14 @@ This document represents our full and shared agreement. Any future changes will 
 Date of Record: ${dateVal}
 
 BE IT KNOWN AND DULY RECORDED that:
-  ${party1}
+  • ${party1}
   AND
-  ${party2}
+  • ${party2}
 
 Have satisfactorily fulfilled all requirements, counseling sessions, and mutual covenants required under this official program under the direction of ${authority}.
 
 RECORD OF COVENANTS & FINDINGS:
-${substituted.trim()}
+${cleanAndFormatContractText(substituted).trim()}
 
 ATTESTATION & AFFIRMATION:
 The undersigned hereby certify that the statements and covenants recorded herein are true, accurate, and entered into with full mutual consent.`;
@@ -248,8 +306,8 @@ The undersigned hereby certify that the statements and covenants recorded herein
   return {
     originalTitle: title,
     originalContent: rawContent,
-    polishedTitle,
-    polishedContent: polishedBody,
+    polishedTitle: cleanAndFormatContractText(polishedTitle),
+    polishedContent: cleanAndFormatContractText(polishedBody),
     summaryOfEnhancements: enhancements,
     keyProtectionsAdded: protections,
     standardType,
@@ -321,10 +379,16 @@ Rules:
    - "pastoral_covenant": Solemn, dignified premarital/marital/counseling covenant with spiritual/ethical gravity, mutual commitments, pastoral care, and affirmation.
    - "plain_english_business": Crystal-clear, modern, readable provisions with zero archaic clutter, transparent mutual duties, and straightforward remedies.
    - "formal_attestation": Formal sworn affidavit/certificate of completion with record of covenants, witness affirmation, and authentic seal block.
-3. FORMATTING: Clean Markdown with bold section titles, bulleted party rosters, and clear paragraphing.
-4. DO NOT OUTPUT HTML TAGS or code fences around the text. Return a clean JSON object according to the response schema.`;
+3. FORMATTING & CLEANLINESS (CRITICAL):
+   - NO MARKDOWN ASTERISKS: Do NOT use asterisks (* or **) anywhere in the document text. Never output **bold**, *italics*, or * list items.
+   - Clean Typography: Use clean standard UPPERCASE lettering for major section titles (e.g., 'SECTION 1.0 — PURPOSE AND SCOPE', 'ARTICLE I — MUTUAL COVENANTS', 'WHEREAS,', 'NOW, THEREFORE,').
+   - Clean Numbering: Use clean numbering format (e.g., '1.1 Mutual Honor & Respect.', '1.2 Good Faith Participation.').
+   - Clean Bullet Points: Use standard bullet characters ('  • ') for rosters and items.
+   - Clean Paragraphs: Separate clauses and sections with clean blank lines.
+4. PURE TEXT ONLY: Do NOT output HTML tags or code fences. Return a clean JSON object according to the response schema.`;
 
     const promptText = `Please polish and standardize the following contract document to the "${standardInfo.name}" (${standardType}).
+Ensure ALL asterisks are completely removed and the typography is pure, clean, and publication-ready.
 
 Original Document Title: ${title}
 
@@ -341,7 +405,7 @@ ${rawContent}
 
 ${customInstructions ? `Additional User Instructions: "${customInstructions}"` : ''}
 
-Generate a comprehensive, beautifully drafted, professional industry-standard version.`;
+Generate a comprehensive, beautifully drafted, professional industry-standard version with zero markdown asterisks.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -355,11 +419,11 @@ Generate a comprehensive, beautifully drafted, professional industry-standard ve
           properties: {
             polishedTitle: {
               type: Type.STRING,
-              description: 'An elevated, professional, formal title for the agreement.'
+              description: 'An elevated, professional, formal title for the agreement without asterisks.'
             },
             polishedContent: {
               type: Type.STRING,
-              description: 'The complete, fully drafted, polished industry-standard contract text incorporating all filled variables.'
+              description: 'The complete, fully drafted, polished industry-standard contract text incorporating all filled variables with zero asterisks.'
             },
             summaryOfEnhancements: {
               type: Type.ARRAY,
@@ -380,16 +444,26 @@ Generate a comprehensive, beautifully drafted, professional industry-standard ve
     const responseText = response.text;
     if (responseText) {
       const parsed = JSON.parse(responseText);
+      const cleanedPolishedContent = cleanAndFormatContractText(parsed.polishedContent || rawContent);
+      const cleanedPolishedTitle = cleanAndFormatContractText(parsed.polishedTitle || title);
+
+      const returnedEnhancements: string[] = parsed.summaryOfEnhancements || [
+        'Standardized document hierarchy and clause structure',
+        'Incorporated filled variables seamlessly',
+        'Enhanced enforceability and clarity'
+      ];
+      
+      // Ensure clean formatting enhancement is acknowledged
+      if (!returnedEnhancements.some(e => e.toLowerCase().includes('asterisk') || e.toLowerCase().includes('clean'))) {
+        returnedEnhancements.unshift('Removed unnecessary markdown asterisks & standardized clean typography');
+      }
+
       return {
         originalTitle: title,
         originalContent: rawContent,
-        polishedTitle: parsed.polishedTitle || title,
-        polishedContent: parsed.polishedContent || rawContent,
-        summaryOfEnhancements: parsed.summaryOfEnhancements || [
-          'Standardized document hierarchy and clause structure',
-          'Incorporated filled variables seamlessly',
-          'Enhanced enforceability and clarity'
-        ],
+        polishedTitle: cleanedPolishedTitle,
+        polishedContent: cleanedPolishedContent,
+        summaryOfEnhancements: returnedEnhancements,
         keyProtectionsAdded: parsed.keyProtectionsAdded || [
           'Confidentiality & Mutual Care Safeguards',
           'Dispute Resolution & Severability'

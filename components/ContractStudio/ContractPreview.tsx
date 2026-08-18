@@ -53,7 +53,19 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
   const processedText = renderContractText(rawContent, fields, highlightPlaceholders);
 
   // Split into paragraphs for proper typographic structure
-  const paragraphs = processedText.split('\n\n').filter(p => p.trim());
+  const rawParagraphs = processedText.split('\n\n').filter(p => p.trim());
+
+  // Clean and format each paragraph so markdown asterisks never leak into rendered output
+  const paragraphs = rawParagraphs.map(p => {
+    return p
+      .replace(/\*{3}([^\*\n\r]+)\*{3}/g, '<strong>$1</strong>')
+      .replace(/\*{2}([^\*\n\r]+)\*{2}/g, '<strong>$1</strong>')
+      .replace(/\*([^\*\n\r]+)\*/g, '$1')
+      .replace(/\\\*/g, '')
+      .replace(/\*{1,}/g, '');
+  });
+
+  const displayTitle = (title || 'Covenant Contract & Agreement').replace(/\*{1,}/g, '').trim();
 
   // Render Seal helper
   const renderSeal = (extraClasses: string = '') => {
@@ -170,7 +182,7 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
                     color: theme.accentColor
                   }}
                 >
-                  {title || 'Covenant Contract & Agreement'}
+                  {displayTitle}
                 </h1>
               </div>
 

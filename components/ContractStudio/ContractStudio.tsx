@@ -38,7 +38,8 @@ import {
   FolderOpen,
   HardDrive,
   Cloud,
-  Award
+  Award,
+  Wand2
 } from 'lucide-react';
 import { 
   ContractField, 
@@ -62,7 +63,7 @@ import SaveContractModal from './SaveContractModal';
 import SavedDraftsModal from './SavedDraftsModal';
 import SealUploadModal from '../SealUploadModal';
 import OfficialSeal from '../OfficialSeal';
-import { PolishResult } from '../../services/polishService';
+import { PolishResult, cleanAndFormatContractText } from '../../services/polishService';
 
 interface ContractStudioProps {
   user: UserProfile | null;
@@ -211,11 +212,13 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
   // Apply Polished Industry Standard Version
   const handleApplyPolishedVersion = (result: PolishResult) => {
-    setDocumentTitle(result.polishedTitle);
-    setRawContent(result.polishedContent);
+    const cleanTitle = cleanAndFormatContractText(result.polishedTitle);
+    const cleanContent = cleanAndFormatContractText(result.polishedContent);
+    setDocumentTitle(cleanTitle);
+    setRawContent(cleanContent);
     
     // Auto-switch to preview and notify
-    setPolishSuccessToast(`Polished to ${result.standardName}! Incorporated ${result.filledVariablesCount} filled variables.`);
+    setPolishSuccessToast(`Polished to ${result.standardName}! Formatted cleanly with all unnecessary asterisks removed.`);
     setTimeout(() => setPolishSuccessToast(null), 5000);
   };
   
@@ -1106,14 +1109,29 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
           {/* TAB 2: EDIT RAW TEXT & CLAUSES */}
           {activeTab === 'text' && (
             <div className="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-800">Contract Content & Clauses</span>
-                <button
-                  onClick={() => setShowClauseModal(true)}
-                  className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition-colors"
-                >
-                  <BookOpen size={13} /> Clause Library
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      const cleaned = cleanAndFormatContractText(rawContent);
+                      setRawContent(cleaned);
+                      setPolishSuccessToast("Formatting cleaned and all asterisks removed!");
+                      setTimeout(() => setPolishSuccessToast(null), 3000);
+                    }}
+                    className="px-2.5 py-1 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    title="Remove all markdown asterisks, format section headings, and clean paragraph breaks"
+                  >
+                    <Wand2 size={13} className="text-amber-700" />
+                    <span>Clean Asterisks & Format</span>
+                  </button>
+                  <button
+                    onClick={() => setShowClauseModal(true)}
+                    className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition-colors"
+                  >
+                    <BookOpen size={13} /> Clause Library
+                  </button>
+                </div>
               </div>
 
               {/* Quick Placeholder Inserts */}
@@ -1141,7 +1159,12 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               />
 
               <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-200">
-                <span>{rawContent.split(/\s+/).filter(Boolean).length} words</span>
+                <div className="flex items-center gap-3">
+                  <span>{rawContent.split(/\s+/).filter(Boolean).length} words</span>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                    Clean Typography Standard
+                  </span>
+                </div>
                 <button
                   onClick={() => {
                     if (confirm("Reset contract back to default standard covenant template?")) {
