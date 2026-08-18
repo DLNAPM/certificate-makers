@@ -18,6 +18,7 @@ interface ContractPreviewProps {
   fields: ContractField[];
   signatures: ContractSignature[];
   includeSignatures?: boolean;
+  showSolemnTitle?: boolean;
   themeId: string;
   sealType: OfficialSealType;
   customSealUrl?: string;
@@ -36,6 +37,7 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
   fields,
   signatures,
   includeSignatures = true,
+  showSolemnTitle = true,
   themeId,
   sealType,
   customSealUrl,
@@ -167,14 +169,16 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
               )}
 
               <div className={`flex-1 ${sealPosition === 'header_center' ? 'text-center' : 'text-center sm:text-left'}`}>
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
-                  <span
-                    className="text-[11px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded"
-                    style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}
-                  >
-                    Solemn Agreement & Covenant
-                  </span>
-                </div>
+                {showSolemnTitle && (
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                    <span
+                      className="text-[11px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded"
+                      style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}
+                    >
+                      Solemn Agreement & Covenant
+                    </span>
+                  </div>
+                )}
                 <h1
                   className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight"
                   style={{

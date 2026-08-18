@@ -85,6 +85,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [fields, setFields] = useState<ContractField[]>(initialParsed.fields);
   const [signatures, setSignatures] = useState<ContractSignature[]>(initialParsed.signatures);
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
+  const [showSolemnTitle, setShowSolemnTitle] = useState<boolean>(true);
   const [selectedThemeId, setSelectedThemeId] = useState('parchment-classic');
   const [selectedSeal, setSelectedSeal] = useState<OfficialSealType>('covenant_gold');
   const [customSealUrl, setCustomSealUrl] = useState<string>('');
@@ -150,6 +151,9 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     setSignatures(draft.signatures || []);
     if (draft.includeSignatures !== undefined) {
       setIncludeSignatures(draft.includeSignatures);
+    }
+    if (draft.showSolemnTitle !== undefined) {
+      setShowSolemnTitle(draft.showSolemnTitle);
     }
     if (draft.themeId) {
       setSelectedThemeId(draft.themeId);
@@ -1161,6 +1165,30 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 </div>
               </div>
 
+              {/* Title Header Check-mark Banner Option */}
+              <div className="p-3 bg-slate-50 hover:bg-slate-100/60 rounded-xl border border-slate-200 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={14} className="text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">"Solemn Agreement & Covenant" Title Banner</p>
+                      <p className="text-[10px] text-slate-500">Uncheck to remove this top title badge from the contract header</p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={showSolemnTitle}
+                      onChange={(e) => setShowSolemnTitle(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-slate-700">
+                      {showSolemnTitle ? 'Active' : 'Disabled'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
               {/* Quick Placeholder Inserts */}
               <div className="space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500">Insert Placeholder Variable:</span>
@@ -1386,8 +1414,29 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               <div className="space-y-3 pt-4 border-t border-slate-200">
                 <h4 className="text-xs font-bold text-slate-800">Preview & Output Options</h4>
                 
+                {/* Title Checkmark Toggle: Solemn Agreement & Covenant */}
+                <label className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 cursor-pointer transition-colors">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <p className="text-xs font-bold text-slate-900">Header Title: "Solemn Agreement & Covenant"</p>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                        showSolemnTitle ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {showSolemnTitle ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Display or hide the "Solemn Agreement & Covenant" header title banner on all contracts and PDF exports</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showSolemnTitle}
+                    onChange={(e) => setShowSolemnTitle(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0 ml-2"
+                  />
+                </label>
+
                 {/* Signatures Toggle Option */}
-                <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                <label className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 cursor-pointer transition-colors">
                   <div>
                     <p className="text-xs font-bold text-slate-800">Include Bottom Signatures</p>
                     <p className="text-[10px] text-slate-500">Render digital signature lines at bottom of document & print/PDF</p>
@@ -1396,7 +1445,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                     type="checkbox"
                     checked={includeSignatures}
                     onChange={(e) => setIncludeSignatures(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0 ml-2"
                   />
                 </label>
 
@@ -1615,6 +1664,19 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               </button>
 
               <button
+                onClick={() => setShowSolemnTitle(!showSolemnTitle)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border cursor-pointer ${
+                  showSolemnTitle
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                    : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                }`}
+                title="Toggle 'Solemn Agreement & Covenant' title banner on/off for all contracts"
+              >
+                <Sparkles size={11} className={showSolemnTitle ? 'text-amber-600' : 'text-slate-400'} />
+                <span>Solemn Header: {showSolemnTitle ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
                 onClick={() => setShowSealModal(true)}
                 className="px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors border bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100 cursor-pointer shadow-2xs"
                 title="Upload custom official seal or change medallion"
@@ -1648,6 +1710,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
             fields={fields}
             signatures={signatures}
             includeSignatures={includeSignatures}
+            showSolemnTitle={showSolemnTitle}
             themeId={selectedThemeId}
             sealType={selectedSeal}
             customSealUrl={customSealUrl}
@@ -1719,6 +1782,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
           fields={fields}
           signatures={signatures}
           includeSignatures={includeSignatures}
+          showSolemnTitle={showSolemnTitle}
           selectedThemeId={selectedThemeId}
           selectedSeal={selectedSeal}
           customSealUrl={customSealUrl}

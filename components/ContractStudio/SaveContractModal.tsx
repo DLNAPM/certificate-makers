@@ -27,6 +27,7 @@ interface SaveContractModalProps {
   fields: ContractField[];
   signatures: ContractSignature[];
   includeSignatures: boolean;
+  showSolemnTitle?: boolean;
   selectedThemeId: string;
   selectedSeal: OfficialSealType;
   customSealUrl?: string;
@@ -46,6 +47,7 @@ const SaveContractModal: React.FC<SaveContractModalProps> = ({
   fields,
   signatures,
   includeSignatures,
+  showSolemnTitle = true,
   selectedThemeId,
   selectedSeal,
   customSealUrl,
@@ -92,6 +94,7 @@ const SaveContractModal: React.FC<SaveContractModalProps> = ({
         fields,
         signatures,
         includeSignatures,
+        showSolemnTitle,
         themeId: selectedThemeId,
         sealType: selectedSeal,
         customSealUrl,

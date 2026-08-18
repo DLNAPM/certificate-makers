@@ -135,6 +135,7 @@ export interface ContractDocument {
   id: string;
   title: string;
   subtitle?: string;
+  showSolemnTitle?: boolean;
   originalFileName?: string;
   fileType?: 'docx' | 'pdf' | 'txt' | 'custom';
   rawContent: string;
