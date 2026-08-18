@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, FileText, Sparkles, CheckCircle2, ArrowRight, AlertCircle, FileCode, BookOpen } from 'lucide-react';
+import { X, Upload, FileText, Sparkles, CheckCircle2, ArrowRight, AlertCircle, FileCode, BookOpen, Layers, Check } from 'lucide-react';
 import { SAMPLE_CONTRACTS } from '../../constants';
 import { parseUploadedContractFile, extractFieldsAndSignatures, ParseResult } from '../../services/documentParser';
 
@@ -12,28 +12,36 @@ const ContractUploadModal: React.FC<ContractUploadModalProps> = ({ onLoadParsedC
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [parsedPreview, setParsedPreview] = useState<ParseResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFile = async (file: File) => {
     setErrorMessage(null);
     setIsProcessing(true);
+    setParsedPreview(null);
 
     try {
       const validExtensions = ['docx', 'pdf', 'txt', 'md', 'rtf'];
       const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
       if (!validExtensions.includes(fileExt)) {
-        throw new Error(`Unsupported file type (.${fileExt}). Please upload a Word (.docx), PDF (.pdf), or Text (.txt) file.`);
+        throw new Error(`Unsupported file type (.${fileExt}). Please upload a Word (.docx), PDF (.pdf), or Text (.txt) template file.`);
       }
 
       const result = await parseUploadedContractFile(file);
-      onLoadParsedContract(result);
-      onClose();
+      setParsedPreview(result);
     } catch (err: any) {
       console.error('File parsing error:', err);
       setErrorMessage(err.message || 'Failed to read contract file. Please try a different document or format.');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmImport = () => {
+    if (parsedPreview) {
+      onLoadParsedContract(parsedPreview);
+      onClose();
     }
   };
 
@@ -50,13 +58,15 @@ const ContractUploadModal: React.FC<ContractUploadModalProps> = ({ onLoadParsedC
     if (!sample) return;
 
     const detected = extractFieldsAndSignatures(sample.content, sample.title);
-    onLoadParsedContract({
+    const result: ParseResult = {
       title: sample.title,
-      rawText: sample.content,
+      rawText: detected.transformedText || sample.content,
       detectedFields: detected.fields,
       detectedSignatures: detected.signatures,
-      fileType: 'custom'
-    });
+      fileType: 'custom',
+      scannedVariableCount: detected.fields.length
+    };
+    onLoadParsedContract(result);
     onClose();
   };
 
@@ -71,8 +81,8 @@ const ContractUploadModal: React.FC<ContractUploadModalProps> = ({ onLoadParsedC
               <Upload size={18} />
             </div>
             <div>
-              <h3 className="font-bold text-lg">Upload Sample Contract</h3>
-              <p className="text-xs text-slate-400">Import MS-Word (.docx), PDF, or Text to extract and fill fields</p>
+              <h3 className="font-bold text-lg">Upload Template File</h3>
+              <p className="text-xs text-slate-400">Scan MS-Word (.docx), PDF, or Text to auto-generate variables on the left pane</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-full transition-colors">
@@ -92,57 +102,115 @@ const ContractUploadModal: React.FC<ContractUploadModalProps> = ({ onLoadParsedC
             </div>
           )}
 
-          {/* Drag & Drop Area */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-              isDragging
-                ? 'border-indigo-600 bg-indigo-50/50 scale-[0.99]'
-                : 'border-slate-300 hover:border-slate-400 bg-slate-50/50 hover:bg-slate-50'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".docx,.pdf,.txt,.md,.rtf"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                  handleFile(e.target.files[0]);
-                }
-              }}
-            />
-
-            {isProcessing ? (
-              <div className="py-6 flex flex-col items-center justify-center space-y-3">
-                <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-bold text-slate-800">Extracting document text & detecting fields...</p>
-                <p className="text-xs text-slate-500">Scanning for party names, dates, clauses, and blanks</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="w-14 h-14 mx-auto bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm">
-                  <Upload size={28} />
-                </div>
-                <div>
-                  <p className="text-base font-bold text-slate-900">
-                    Click to browse or drag & drop contract
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Supports Microsoft Word (<span className="font-semibold text-slate-700">.docx</span>), PDF (<span className="font-semibold text-slate-700">.pdf</span>), and Plain Text (<span className="font-semibold text-slate-700">.txt</span>)
-                  </p>
-                </div>
-
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-[11px] font-medium text-slate-600 shadow-2xs">
-                  <Sparkles size={13} className="text-indigo-600" />
-                  Auto-detects [Party Names], dates, counseling hours & blanks
+          {/* Parsed Scanning Success Preview Step */}
+          {parsedPreview ? (
+            <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-600 text-white rounded-xl">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-emerald-950">
+                      Scan Complete: Found {parsedPreview.detectedFields.length} Dynamic Variables
+                    </h4>
+                    <p className="text-xs text-emerald-800/80">
+                      "{parsedPreview.title}" ready to load into the studio left pane.
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Scanned Variables Chips */}
+              <div className="bg-white/80 p-3.5 rounded-xl border border-emerald-200/80 space-y-2">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                  Auto-Detected Fillable Fields:
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                  {parsedPreview.detectedFields.map((field) => (
+                    <span
+                      key={field.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-semibold border border-slate-200"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                      {field.label}
+                      <span className="text-[10px] text-slate-500 font-mono font-normal">
+                        ({field.category || 'General'})
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => setParsedPreview(null)}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+                >
+                  ← Choose a different file
+                </button>
+                <button
+                  onClick={handleConfirmImport}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all hover:shadow"
+                >
+                  <span>Auto-Generate Fields on Left Pane</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Drag & Drop Area */
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-indigo-600 bg-indigo-50/50 scale-[0.99]'
+                  : 'border-slate-300 hover:border-slate-400 bg-slate-50/50 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,.pdf,.txt,.md,.rtf"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                  }
+                }}
+              />
+
+              {isProcessing ? (
+                <div className="py-6 flex flex-col items-center justify-center space-y-3">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm font-bold text-slate-800">Scanning template file for variables...</p>
+                  <p className="text-xs text-slate-500">Detecting brackets, underlines, party names, dates, and blanks</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="w-14 h-14 mx-auto bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm">
+                    <Upload size={28} />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-slate-900">
+                      Click to browse or drag & drop template file
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Supports Microsoft Word (<span className="font-semibold text-slate-700">.docx</span>), PDF (<span className="font-semibold text-slate-700">.pdf</span>), and Plain Text (<span className="font-semibold text-slate-700">.txt</span>)
+                    </p>
+                  </div>
+
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-[11px] font-medium text-slate-600 shadow-2xs">
+                    <Sparkles size={13} className="text-indigo-600" />
+                    Auto-scans variables & populates left pane form automatically
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Preset Sample Contracts Divider */}
           <div className="relative">

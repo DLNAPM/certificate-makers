@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Upload,
   FileText,
@@ -24,16 +24,19 @@ import {
   Shield,
   Search,
   Check,
-  FileDown
+  FileDown,
+  RefreshCw,
+  Copy,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { ContractField, ContractSignature, ContractDocument, UserProfile, StandardClause } from '../../types';
 import { SAMPLE_CONTRACTS, CONTRACT_THEMES } from '../../constants';
-import { ParseResult, extractFieldsAndSignatures } from '../../services/documentParser';
+import { ParseResult, extractFieldsAndSignatures, parseUploadedContractFile } from '../../services/documentParser';
 import ContractPreview from './ContractPreview';
 import ContractUploadModal from './ContractUploadModal';
 import SignatureModal from './SignatureModal';
 import ClauseLibraryModal from './ClauseLibraryModal';
-import { GoogleGenAI } from '@google/genai';
 
 interface ContractStudioProps {
   user: UserProfile | null;
@@ -64,8 +67,17 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [showClauseModal, setShowClauseModal] = useState(false);
   const [activeSignature, setActiveSignature] = useState<ContractSignature | null>(null);
   const [searchField, setSearchField] = useState('');
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
+  const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
+  
+  // Scan notification state
+  const [scanNotification, setScanNotification] = useState<{
+    fileName: string;
+    variableCount: number;
+  } | null>(null);
+
+  const leftPaneFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isLeftPaneDragging, setIsLeftPaneDragging] = useState(false);
 
   // Sync field value changes with signature names if they match
   const handleFieldValueChange = (fieldId: string, newValue: string) => {
@@ -76,11 +88,11 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
       const modifiedField = prev.find(f => f.id === fieldId);
       if (modifiedField) {
         const key = modifiedField.key.toLowerCase();
-        if (key.includes('bride') || key.includes('party1')) {
+        if (key.includes('bride') || key.includes('party1') || key.includes('spouse1')) {
           setSignatures(sigs => sigs.map(s => s.role === 'bride' ? { ...s, name: newValue } : s));
-        } else if (key.includes('groom') || key.includes('party2')) {
+        } else if (key.includes('groom') || key.includes('party2') || key.includes('spouse2')) {
           setSignatures(sigs => sigs.map(s => s.role === 'groom' ? { ...s, name: newValue } : s));
-        } else if (key.includes('counselor') || key.includes('officiant')) {
+        } else if (key.includes('counselor') || key.includes('officiant') || key.includes('pastor')) {
           setSignatures(sigs => sigs.map(s => s.role === 'counselor' ? { ...s, name: newValue } : s));
         }
       }
@@ -90,7 +102,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
   // Add custom user-defined field
   const handleAddCustomField = () => {
-    const varName = prompt("Enter a variable name for the new field (e.g. 'Witness 2', 'Church City'):");
+    const varName = prompt("Enter a variable name for the new field (e.g. 'Witness 2', 'Church City', 'Honorarium'):");
     if (!varName || !varName.trim()) return;
 
     const trimmed = varName.trim();
@@ -98,19 +110,18 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     const newPlaceholder = `[${trimmed}]`;
 
     const newField: ContractField = {
-      id: `custom_${Date.now()}`,
+      id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       key: normalizedKey || `field_${Date.now()}`,
       label: trimmed,
       placeholder: newPlaceholder,
       value: '',
       type: 'text',
-      category: 'Custom Fields',
+      category: 'Custom Template Variables',
       isCustom: true
     };
 
     setFields(prev => [...prev, newField]);
 
-    // Automatically append placeholder to text if user wishes
     if (confirm(`Do you also want to append '${newPlaceholder}' to your contract text now?`)) {
       setRawContent(prev => `${prev}\n\n${trimmed}: ${newPlaceholder}`);
     }
@@ -121,13 +132,58 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     setFields(prev => prev.filter(f => f.id !== fieldId));
   };
 
-  // Handle uploaded contract parsed data
+  // Handle uploaded contract parsed data and auto-generate fields in left pane
   const handleLoadParsedContract = (result: ParseResult) => {
     setDocumentTitle(result.title);
     setRawContent(result.rawText);
     setFields(result.detectedFields);
     setSignatures(result.detectedSignatures);
+    
+    // Auto-switch to Fields tab on left pane
     setActiveTab('fields');
+
+    // Show scan notification
+    setScanNotification({
+      fileName: result.fileName || result.title,
+      variableCount: result.detectedFields.length
+    });
+  };
+
+  // Quick re-scan variables from the current rawContent
+  const handleRescanVariables = () => {
+    const detected = extractFieldsAndSignatures(rawContent, documentTitle);
+    
+    // Preserve existing field values if keys match
+    const mergedFields = detected.fields.map(newField => {
+      const existing = fields.find(f => f.key === newField.key || f.label.toLowerCase() === newField.label.toLowerCase());
+      if (existing && existing.value) {
+        return { ...newField, value: existing.value };
+      }
+      return newField;
+    });
+
+    setFields(mergedFields);
+    setScanNotification({
+      fileName: 'Current Contract Document',
+      variableCount: mergedFields.length
+    });
+  };
+
+  // Direct file upload from left pane
+  const handleLeftPaneFileUpload = async (file: File) => {
+    try {
+      const result = await parseUploadedContractFile(file);
+      handleLoadParsedContract(result);
+    } catch (err: any) {
+      alert(`Error reading template file: ${err.message || 'Please try another file format.'}`);
+    }
+  };
+
+  // Copy placeholder tag
+  const handleCopyTag = (placeholder: string, fieldId: string) => {
+    navigator.clipboard.writeText(placeholder);
+    setCopiedFieldId(fieldId);
+    setTimeout(() => setCopiedFieldId(null), 1500);
   };
 
   // Handle inserting standard clause into text
@@ -172,34 +228,65 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
     document.body.removeChild(element);
   };
 
-  // Quick smart autofill for test/demo
+  // Quick smart autofill with realistic sample values
   const handleAutofillDemo = () => {
     const demoValues: Record<string, string> = {
-      brideName: 'Jennifer Allison Taft',
-      groomName: 'Clint Patrick Williams',
-      counselorName: 'Rev. Dr. Michael Smith',
-      organizationName: 'Grace Covenant Church',
-      churchName: 'Grace Covenant Church',
-      agreementDate: 'October 24, 2026',
+      bridename: 'Jennifer Allison Taft',
+      groomname: 'Clint Patrick Williams',
+      counselorname: 'Rev. Dr. Michael Smith',
+      counselortitle: 'Senior Pastor & Marital Counselor',
+      organizationname: 'Grace Covenant Fellowship',
+      churchaddress: '104 Covenant Way, Austin, TX',
+      agreementdate: 'October 24, 2026',
+      weddingdate: 'November 14, 2026',
       location: 'Grace Fellowship Chapel, Austin, TX',
-      sessionCount: '8 Sessions (16 In-Depth Hours)',
+      jurisdiction: 'Travis County, Texas',
+      sessioncount: '8 Sessions (16 In-Depth Hours)',
+      curriculum: 'Prepare-Enrich & Covenant Accord',
       fee: '$300.00 Honorarium',
-      honorariumFee: '$300.00 Honorarium',
+      deposit: '$100.00 Deposit',
       witness1: 'Sarah Jenkins',
-      witness2: 'David Miller'
+      witness2: 'David Miller',
+      bridephone: '(555) 234-5678',
+      groomphone: '(555) 876-5432',
+      brideemail: 'jennifer.taft@example.com',
+      groomemail: 'clint.williams@example.com'
     };
 
     setFields(prev => prev.map(f => {
-      const match = Object.keys(demoValues).find(k => k.toLowerCase() === f.key.toLowerCase() || f.label.toLowerCase().includes(k.toLowerCase()));
-      return match ? { ...f, value: demoValues[match] } : f;
+      const normalizedKey = f.key.toLowerCase();
+      let matchedVal = demoValues[normalizedKey];
+
+      if (!matchedVal) {
+        // Match by label
+        const lowerLabel = f.label.toLowerCase();
+        for (const [k, v] of Object.entries(demoValues)) {
+          if (lowerLabel.includes(k) || k.includes(lowerLabel)) {
+            matchedVal = v;
+            break;
+          }
+        }
+      }
+
+      return matchedVal ? { ...f, value: matchedVal } : (f.value ? f : { ...f, value: 'Sample Data' });
     }));
 
     setSignatures(prev => prev.map(s => {
       if (s.role === 'bride') return { ...s, name: 'Jennifer Allison Taft' };
       if (s.role === 'groom') return { ...s, name: 'Clint Patrick Williams' };
       if (s.role === 'counselor') return { ...s, name: 'Rev. Dr. Michael Smith' };
+      if (s.role === 'witness' && s.id.includes('1')) return { ...s, name: 'Sarah Jenkins' };
+      if (s.role === 'witness' && s.id.includes('2')) return { ...s, name: 'David Miller' };
       return s;
     }));
+  };
+
+  // Clear all fields
+  const handleClearAllFields = () => {
+    if (confirm("Clear all field values? (Placeholders and variables will remain)")) {
+      setFields(prev => prev.map(f => ({ ...f, value: '' })));
+      setSignatures(prev => prev.map(s => ({ ...s, name: '', signatureData: undefined })));
+    }
   };
 
   // Save contract to local storage and show feedback
@@ -231,6 +318,9 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
   // Group fields by category
   const categories = Array.from(new Set(filteredFields.map(f => f.category || 'General Details')));
+
+  // Count filled vs total
+  const filledCount = fields.filter(f => f.value && f.value.trim().length > 0).length;
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-100 text-slate-900">
@@ -268,13 +358,14 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
           {/* Right: Primary Studio Actions */}
           <div className="flex items-center gap-2">
-            {/* Upload Button */}
+            {/* Upload Template Button */}
             <button
               onClick={() => setShowUploadModal(true)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
+              title="Upload MS-Word, PDF, or Text Template file to scan variables"
             >
               <Upload size={14} />
-              <span className="hidden sm:inline">Upload File</span>
+              <span className="hidden sm:inline">Upload Template File</span>
               <span className="sm:hidden">Upload</span>
             </button>
 
@@ -313,13 +404,13 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
       <div className="flex-1 flex flex-col lg:flex-row">
         
         {/* Left Control Center Panel */}
-        <aside className="w-full lg:w-[440px] bg-white border-r border-slate-200 flex flex-col lg:h-[calc(100vh-4rem)] lg:sticky lg:top-16 shadow-lg z-30 no-print">
+        <aside className="w-full lg:w-[460px] bg-white border-r border-slate-200 flex flex-col lg:h-[calc(100vh-4rem)] lg:sticky lg:top-16 shadow-lg z-30 no-print">
           
           {/* Navigation Tabs */}
           <div className="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 shrink-0">
             <button
               onClick={() => setActiveTab('fields')}
-              className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 activeTab === 'fields'
                   ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -331,7 +422,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
             <button
               onClick={() => setActiveTab('text')}
-              className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 activeTab === 'text'
                   ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -343,7 +434,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
             <button
               onClick={() => setActiveTab('style')}
-              className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 activeTab === 'style'
                   ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -355,37 +446,118 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
 
             <button
               onClick={() => setActiveTab('signatures')}
-              className={`flex-1 py-2 px-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              className={`flex-1 py-2 px-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 activeTab === 'signatures'
                   ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <PenTool size={14} />
-              <span>Signatures</span>
+              <span>Signatures ({signatures.length})</span>
             </button>
           </div>
 
           {/* TAB 1: FORM FIELDS & FILLER */}
           {activeTab === 'fields' && (
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               
-              {/* Quick Helper Tools */}
-              <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-indigo-600" /> Necessary Contract Fields
-                  </span>
+              {/* Scan Notification Banner */}
+              {scanNotification && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 relative animate-in fade-in slide-in-from-top-2 duration-200">
                   <button
-                    onClick={handleAutofillDemo}
-                    className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs hover:shadow-xs transition-all"
+                    onClick={() => setScanNotification(null)}
+                    className="absolute top-2.5 right-2.5 text-emerald-700 hover:text-emerald-950 p-0.5 rounded"
                   >
-                    Quick Auto-Fill Sample
+                    <X size={14} />
                   </button>
+                  <div className="flex items-center gap-2 text-emerald-900 text-xs font-bold">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>Template Scanned & Variables Generated</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed pr-4">
+                    Extracted <strong>{scanNotification.variableCount} dynamic variables</strong> from "<strong>{scanNotification.fileName}</strong>". Ready to be filled out below!
+                  </p>
                 </div>
-                <p className="text-[11px] text-indigo-900/70 leading-relaxed">
-                  Fill the fields below. Every change updates the preview and legal clauses automatically in real time.
+              )}
+
+              {/* Quick Template Upload Dropzone right inside the Left Pane */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsLeftPaneDragging(true); }}
+                onDragLeave={() => setIsLeftPaneDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsLeftPaneDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleLeftPaneFileUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                className={`p-3 rounded-xl border-2 border-dashed transition-all cursor-pointer text-center ${
+                  isLeftPaneDragging
+                    ? 'border-indigo-600 bg-indigo-50/70'
+                    : 'border-slate-300 hover:border-indigo-400 bg-slate-50/60 hover:bg-indigo-50/20'
+                }`}
+                onClick={() => leftPaneFileInputRef.current?.click()}
+              >
+                <input
+                  ref={leftPaneFileInputRef}
+                  type="file"
+                  accept=".docx,.pdf,.txt,.md,.rtf"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleLeftPaneFileUpload(e.target.files[0]);
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-center gap-2">
+                  <div className="p-1 bg-indigo-100 text-indigo-700 rounded-lg shrink-0">
+                    <Upload size={14} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-800">
+                    Drop a Word (.docx), PDF, or Text Template
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Click to browse or drop file to auto-scan and re-generate variables
                 </p>
+              </div>
+
+              {/* Progress & Quick Action Toolbar */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-800">
+                      Variable Fill Progress:
+                    </span>
+                    <span className="text-xs font-extrabold text-indigo-600">
+                      {filledCount}/{fields.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleAutofillDemo}
+                      className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs hover:shadow-xs transition-all flex items-center gap-1"
+                      title="Fill all detected variables with sample premarital data"
+                    >
+                      <Sparkles size={11} /> Auto-Fill Demo
+                    </button>
+                    <button
+                      onClick={handleClearAllFields}
+                      className="text-[11px] font-semibold text-slate-600 hover:text-red-700 bg-white px-2 py-0.5 rounded border border-slate-200 transition-all"
+                      title="Clear all variable values"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-600 transition-all duration-300"
+                    style={{ width: `${fields.length ? (filledCount / fields.length) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
 
               {/* Search & Add Custom Field */}
@@ -396,75 +568,121 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                     type="text"
                     value={searchField}
                     onChange={(e) => setSearchField(e.target.value)}
-                    placeholder="Search fields..."
+                    placeholder="Search variables..."
                     className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
                   />
                 </div>
                 <button
                   onClick={handleAddCustomField}
-                  className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg flex items-center gap-1 shrink-0 transition-colors"
+                  className="px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg flex items-center gap-1 shrink-0 transition-colors"
+                  title="Create a new variable field"
                 >
                   <Plus size={13} /> Add Variable
+                </button>
+                <button
+                  onClick={handleRescanVariables}
+                  className="p-1.5 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg shrink-0 transition-colors"
+                  title="Re-scan document for new bracket variables"
+                >
+                  <RefreshCw size={14} />
                 </button>
               </div>
 
               {/* Categorized Fields Form */}
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {categories.map((category) => {
                   const catFields = filteredFields.filter(f => (f.category || 'General Details') === category);
                   if (catFields.length === 0) return null;
 
                   return (
-                    <div key={category} className="space-y-3">
-                      <h4 className="text-xs font-black tracking-wider uppercase text-slate-400 border-b border-slate-200 pb-1 flex items-center justify-between">
-                        <span>{category}</span>
-                        <span className="text-[10px] font-normal lowercase">{catFields.length} field(s)</span>
-                      </h4>
+                    <div key={category} className="space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                        <span className="text-[11px] font-black tracking-wider uppercase text-slate-500">
+                          {category}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
+                          {catFields.length} {catFields.length === 1 ? 'variable' : 'variables'}
+                        </span>
+                      </div>
 
-                      <div className="space-y-3">
-                        {catFields.map((field) => (
-                          <div
-                            key={field.id}
-                            className="p-3 bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-200/80 transition-colors group"
-                          >
-                            <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                {field.label}
-                              </label>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                  {field.placeholder}
-                                </span>
-                                {field.isCustom && (
+                      <div className="space-y-2.5">
+                        {catFields.map((field) => {
+                          const isFilled = field.value && field.value.trim().length > 0;
+
+                          return (
+                            <div
+                              key={field.id}
+                              className={`p-3 rounded-xl border transition-all ${
+                                isFilled
+                                  ? 'bg-slate-50/70 border-slate-200'
+                                  : 'bg-white border-amber-200/80 shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isFilled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                                  {field.label}
+                                </label>
+                                <div className="flex items-center gap-1">
                                   <button
-                                    onClick={() => handleDeleteField(field.id)}
-                                    className="text-slate-400 hover:text-red-600 p-0.5"
-                                    title="Delete custom variable"
+                                    onClick={() => handleCopyTag(field.placeholder, field.id)}
+                                    className="text-[10px] font-mono text-slate-500 hover:text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1 hover:border-indigo-300 transition-colors"
+                                    title="Click to copy variable tag to clipboard"
                                   >
-                                    <Trash2 size={12} />
+                                    {copiedFieldId === field.id ? (
+                                      <>
+                                        <Check size={10} className="text-emerald-600" />
+                                        <span className="text-emerald-700">Copied</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy size={9} />
+                                        <span>{field.placeholder}</span>
+                                      </>
+                                    )}
                                   </button>
-                                )}
+                                  {field.isCustom && (
+                                    <button
+                                      onClick={() => handleDeleteField(field.id)}
+                                      className="text-slate-400 hover:text-red-600 p-0.5"
+                                      title="Delete custom variable"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
 
-                            {field.type === 'textarea' ? (
-                              <textarea
-                                value={field.value}
-                                onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
-                                placeholder={`Enter ${field.label.toLowerCase()}...`}
-                                className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-y"
-                              />
-                            ) : (
-                              <input
-                                type={field.type === 'date' ? 'text' : field.type}
-                                value={field.value}
-                                onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
-                                placeholder={`e.g. ${field.placeholder}`}
-                                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-                              />
-                            )}
-                          </div>
-                        ))}
+                              {field.type === 'textarea' ? (
+                                <textarea
+                                  value={field.value}
+                                  onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                                  placeholder={`Enter ${field.label.toLowerCase()}...`}
+                                  className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-y"
+                                />
+                              ) : (
+                                <div className="relative flex items-center">
+                                  <input
+                                    type={field.type === 'date' ? 'text' : field.type}
+                                    value={field.value}
+                                    onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+                                    placeholder={`e.g. ${field.placeholder}`}
+                                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium pr-7"
+                                  />
+                                  {field.value && (
+                                    <button
+                                      onClick={() => handleFieldValueChange(field.id, '')}
+                                      className="absolute right-2 text-slate-400 hover:text-slate-600"
+                                      title="Clear value"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -491,7 +709,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
               <div className="space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500">Insert Placeholder Variable:</span>
                 <div className="flex flex-wrap gap-1">
-                  {fields.slice(0, 8).map(f => (
+                  {fields.slice(0, 10).map(f => (
                     <button
                       key={f.id}
                       onClick={() => setRawContent(prev => `${prev} ${f.placeholder}`)}
@@ -518,6 +736,8 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                     if (confirm("Reset contract back to default standard covenant template?")) {
                       setRawContent(defaultSample.content);
                       setDocumentTitle(defaultSample.title);
+                      const scanned = extractFieldsAndSignatures(defaultSample.content, defaultSample.title);
+                      setFields(scanned.fields);
                     }
                   }}
                   className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-medium"
@@ -595,7 +815,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
                   <div>
                     <p className="text-xs font-bold text-slate-800">Highlight Replaced Fields</p>
-                    <p className="text-[10px] text-slate-500">Shows yellow highlight on screen for filled values (auto-hidden in print)</p>
+                    <p className="text-[10px] text-slate-500">Shows clear highlight for filled and unfilled variables on screen (hidden in print)</p>
                   </div>
                   <input
                     type="checkbox"
@@ -698,7 +918,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 onClick={() => setShowUploadModal(true)}
                 className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700 flex items-center justify-center gap-1 transition-colors"
               >
-                <Upload size={13} /> Import Another File
+                <Upload size={13} /> Browse Templates
               </button>
             </div>
           </div>
