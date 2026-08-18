@@ -156,6 +156,66 @@ export const deleteTemplate = async (templateId: string, backgroundUrl?: string)
   }
 };
 
+// -------------------------------------------------------------
+// CONTRACT DRAFT CLOUD STORAGE
+// -------------------------------------------------------------
+
+export const saveContractToCloud = async (contract: any, user: UserProfile): Promise<string> => {
+  if (!db) throw new Error("Firebase DB not configured");
+  
+  const cleanContract = {
+    ...contract,
+    userId: user.uid,
+    creatorName: user.displayName || user.email || 'Anonymous',
+    createdAt: contract.createdAt || Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const docRef = await addDoc(collection(db, "contract_drafts"), cleanContract);
+  return docRef.id;
+};
+
+export const updateContractInCloud = async (docId: string, updates: any): Promise<void> => {
+  if (!db) throw new Error("Firebase DB not configured");
+  const contractDocRef = doc(db, "contract_drafts", docId);
+  const { setDoc } = await import("firebase/firestore");
+  await setDoc(contractDocRef, { ...updates, updatedAt: Date.now() }, { merge: true });
+};
+
+export const fetchCloudContracts = async (user: UserProfile): Promise<any[]> => {
+  if (!db || !user) return [];
+  try {
+    const contractsRef = collection(db, "contract_drafts");
+    const q = query(contractsRef, where("userId", "==", user.uid), orderBy("updatedAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(d => ({
+      id: d.id,
+      cloudId: d.id,
+      isCloud: true,
+      ...(d.data() as object)
+    }));
+  } catch (error: any) {
+    console.warn("Error fetching cloud contracts with sort:", error);
+    try {
+      // Fallback query if compound index not created yet
+      const contractsRef = collection(db, "contract_drafts");
+      const fallbackQ = query(contractsRef, where("userId", "==", user.uid));
+      const snap = await getDocs(fallbackQ);
+      return snap.docs
+        .map(d => ({ id: d.id, cloudId: d.id, isCloud: true, ...(d.data() as object) }))
+        .sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    } catch (fallbackErr) {
+      console.error("Cloud fetch failed:", fallbackErr);
+      return [];
+    }
+  }
+};
+
+export const deleteContractFromCloud = async (docId: string): Promise<void> => {
+  if (!db) throw new Error("Firebase DB not configured");
+  await deleteDoc(doc(db, "contract_drafts", docId));
+};
+
 export type TemplateFilterType = 'community' | 'public' | 'mine' | 'shared';
 
 export const fetchTemplates = async (type: TemplateFilterType, user?: UserProfile) => {

@@ -34,7 +34,10 @@ import {
   LayoutGrid,
   ToggleLeft,
   ToggleRight,
-  Edit3
+  Edit3,
+  FolderOpen,
+  HardDrive,
+  Cloud
 } from 'lucide-react';
 import { ContractField, ContractSignature, ContractDocument, UserProfile, StandardClause } from '../../types';
 import { SAMPLE_CONTRACTS, CONTRACT_THEMES } from '../../constants';
@@ -44,6 +47,8 @@ import ContractUploadModal from './ContractUploadModal';
 import SignatureModal from './SignatureModal';
 import ClauseLibraryModal from './ClauseLibraryModal';
 import IndustryPolishModal from './IndustryPolishModal';
+import SaveContractModal from './SaveContractModal';
+import SavedDraftsModal from './SavedDraftsModal';
 import { PolishResult } from '../../services/polishService';
 
 interface ContractStudioProps {
@@ -81,6 +86,71 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
   const [saveToast, setSaveToast] = useState(false);
   const [polishSuccessToast, setPolishSuccessToast] = useState<string | null>(null);
   const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
+
+  // Saved Drafts state
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
+  const [showLoadDraftModal, setShowLoadDraftModal] = useState(false);
+  const [draftsCount, setDraftsCount] = useState<number>(0);
+
+  // Refresh saved drafts count from local storage
+  const refreshDraftsCount = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('covenant_saved_contracts');
+      const count = stored ? JSON.parse(stored).length : 0;
+      setDraftsCount(count);
+    } catch {
+      setDraftsCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshDraftsCount();
+  }, [refreshDraftsCount]);
+
+  // Keyboard shortcut Ctrl+S / Cmd+S to save draft
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        setShowSaveDraftModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle loading a saved contract draft
+  const handleLoadDraft = (draft: ContractDocument) => {
+    setCurrentDraftId(draft.id);
+    setDocumentTitle(draft.title);
+    setRawContent(draft.rawContent);
+    setFields(draft.fields || []);
+    setSignatures(draft.signatures || []);
+    if (draft.includeSignatures !== undefined) {
+      setIncludeSignatures(draft.includeSignatures);
+    }
+    if (draft.themeId) {
+      setSelectedThemeId(draft.themeId);
+    }
+    if (draft.sealType) {
+      setSelectedSeal(draft.sealType);
+    }
+    setActiveTab('fields');
+    setFieldViewMode('template_order');
+    setPolishSuccessToast(`Loaded saved draft: "${draft.title}" with ${(draft.fields || []).length} variables`);
+    setTimeout(() => setPolishSuccessToast(null), 5000);
+    refreshDraftsCount();
+  };
+
+  // Handle successful save from modal
+  const handleSaveSuccess = (savedDoc: ContractDocument, isCloud: boolean) => {
+    setCurrentDraftId(savedDoc.id);
+    setShowSaveDraftModal(false);
+    refreshDraftsCount();
+    setPolishSuccessToast(`Draft "${savedDoc.title}" saved successfully${isCloud ? ' (synced to Cloud)' : ''}!`);
+    setTimeout(() => setPolishSuccessToast(null), 5000);
+  };
 
   // Apply Polished Industry Standard Version
   const handleApplyPolishedVersion = (result: PolishResult) => {
@@ -404,53 +474,76 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                 type="text"
                 value={documentTitle}
                 onChange={(e) => setDocumentTitle(e.target.value)}
-                className="bg-transparent hover:bg-slate-800 focus:bg-slate-800 px-2 py-1 rounded text-sm font-bold text-white border-none focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px] sm:max-w-xs md:max-w-md truncate"
+                className="bg-transparent hover:bg-slate-800 focus:bg-slate-800 px-2 py-1 rounded text-sm font-bold text-white border-none focus:outline-hidden focus:ring-1 focus:ring-indigo-500 max-w-[180px] sm:max-w-xs md:max-w-md truncate"
                 placeholder="Contract Title..."
               />
+              {currentDraftId && (
+                <span className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60 shadow-2xs">
+                  <Clock size={10} className="text-indigo-400" />
+                  <span>Draft Active</span>
+                </span>
+              )}
             </div>
           </div>
 
           {/* Right: Primary Studio Actions */}
           <div className="flex items-center gap-2">
+            {/* Saved Drafts Button */}
+            <button
+              onClick={() => setShowLoadDraftModal(true)}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-all hover:border-slate-600 cursor-pointer shadow-2xs"
+              title="Load or Manage Saved Contract Drafts"
+            >
+              <FolderOpen size={14} className="text-amber-400" />
+              <span className="hidden sm:inline">Saved Drafts</span>
+              <span className="sm:hidden">Drafts</span>
+              {draftsCount > 0 && (
+                <span className="px-1.5 py-0.2 bg-indigo-600 text-white text-[10px] font-black rounded-full leading-none">
+                  {draftsCount}
+                </span>
+              )}
+            </button>
+
             {/* Polish to Industry Standard Button */}
             <button
               onClick={() => setShowPolishModal(true)}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
               title="Produce a more polished, industry-standard version incorporating all filled variables"
             >
               <Sparkles size={14} className="text-slate-950" />
-              <span className="hidden sm:inline">Polish to Industry Standard</span>
-              <span className="sm:hidden">Polish Standard</span>
+              <span className="hidden md:inline">Polish to Industry Standard</span>
+              <span className="md:hidden">Polish</span>
             </button>
 
             {/* Upload Template Button */}
             <button
               onClick={() => setShowUploadModal(true)}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
               title="Upload MS-Word, PDF, or Text Template file to scan variables"
             >
               <Upload size={14} />
-              <span className="hidden sm:inline">Upload Template File</span>
-              <span className="sm:hidden">Upload</span>
+              <span className="hidden md:inline">Upload Template</span>
+              <span className="md:hidden">Upload</span>
             </button>
 
             {/* Print / Export PDF */}
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
               title="Print to Paper or Save as PDF"
             >
               <Printer size={14} />
-              <span className="hidden md:inline">Print / PDF</span>
+              <span className="hidden lg:inline">Print / PDF</span>
             </button>
 
-            {/* Save Contract */}
+            {/* Save Contract Draft */}
             <button
-              onClick={handleSaveContract}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
-              title="Save Contract Draft"
+              onClick={() => setShowSaveDraftModal(true)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow cursor-pointer"
+              title="Save Contract Draft (Ctrl+S / Cmd+S)"
             >
-              <Save size={16} />
+              <Save size={14} />
+              <span className="hidden sm:inline">Save Draft</span>
             </button>
           </div>
 
@@ -641,15 +734,23 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
                   </div>
                   <div className="flex items-center gap-1">
                     <button
+                      onClick={() => setShowLoadDraftModal(true)}
+                      className="text-[11px] font-semibold text-slate-700 hover:text-indigo-700 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                      title="Load a saved contract draft"
+                    >
+                      <FolderOpen size={11} className="text-amber-500" />
+                      <span>Drafts</span>
+                    </button>
+                    <button
                       onClick={handleAutofillDemo}
-                      className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs hover:shadow-xs transition-all flex items-center gap-1"
+                      className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                       title="Fill all detected variables with sample premarital data"
                     >
                       <Sparkles size={11} /> Auto-Fill Demo
                     </button>
                     <button
                       onClick={handleClearAllFields}
-                      className="text-[11px] font-semibold text-slate-600 hover:text-red-700 bg-white px-2 py-0.5 rounded border border-slate-200 transition-all"
+                      className="text-[11px] font-semibold text-slate-600 hover:text-red-700 bg-white px-2 py-0.5 rounded border border-slate-200 transition-all cursor-pointer"
                       title="Clear all variable values"
                     >
                       Clear
@@ -1361,6 +1462,33 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
           signature={activeSignature}
           onSave={handleSaveSignature}
           onClose={() => setActiveSignature(null)}
+        />
+      )}
+
+      {showSaveDraftModal && (
+        <SaveContractModal
+          currentDraftId={currentDraftId}
+          documentTitle={documentTitle}
+          rawContent={rawContent}
+          fields={fields}
+          signatures={signatures}
+          includeSignatures={includeSignatures}
+          selectedThemeId={selectedThemeId}
+          selectedSeal={selectedSeal}
+          user={user}
+          onSaveSuccess={handleSaveSuccess}
+          onClose={() => setShowSaveDraftModal(false)}
+        />
+      )}
+
+      {showLoadDraftModal && (
+        <SavedDraftsModal
+          currentDraftId={currentDraftId}
+          user={user}
+          onLoadDraft={handleLoadDraft}
+          onOpenSaveModal={() => setShowSaveDraftModal(true)}
+          onLogin={onLogin}
+          onClose={() => setShowLoadDraftModal(false)}
         />
       )}
 
