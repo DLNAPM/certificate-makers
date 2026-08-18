@@ -99,7 +99,7 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
       {/* Printable Sheet (Letter Aspect Ratio / Upright Portrait) */}
       <div
         id="contract-print-sheet"
-        className={`relative w-full max-w-[850px] min-h-[1100px] shadow-2xl p-8 sm:p-14 print:p-6 print:m-0 print:shadow-none print:w-full print:max-w-none print:min-h-0 print:bg-white transition-all ${theme.bgClass}`}
+        className={`relative w-full max-w-[850px] min-h-[1100px] shadow-2xl p-8 sm:p-14 print:p-8 print:m-0 print:shadow-none print:w-full print:max-w-none print:min-h-0 print:bg-white transition-all ${theme.bgClass}`}
         style={{
           backgroundColor: theme.paperColor,
           fontFamily: theme.bodyFont === 'font-serif' ? "'Plus Jakarta Sans', Georgia, serif" : 'inherit'
@@ -118,15 +118,15 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
           </div>
         )}
 
-        {/* Outer & Inner Decorative Borders */}
+        {/* Outer & Inner Decorative Borders (Calibrated to wrap safely around all text) */}
         {theme.pageBorder === 'double' && (
           <>
             <div
-              className="absolute inset-3 sm:inset-4 border-2 pointer-events-none print:inset-2"
+              className="absolute inset-3 sm:inset-4 border-2 pointer-events-none print:inset-2.5"
               style={{ borderColor: theme.accentColor }}
             />
             <div
-              className="absolute inset-5 sm:inset-6 border pointer-events-none opacity-60 print:inset-3"
+              className="absolute inset-5 sm:inset-6 border pointer-events-none opacity-60 print:inset-4"
               style={{ borderColor: theme.accentColor }}
             />
           </>
@@ -135,11 +135,11 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
         {theme.pageBorder === 'ornate' && (
           <>
             <div
-              className="absolute inset-4 border-4 rounded-xl pointer-events-none print:inset-2"
+              className="absolute inset-4 border-4 rounded-xl pointer-events-none print:inset-3"
               style={{ borderColor: theme.accentColor }}
             />
             <div
-              className="absolute inset-6 border border-dashed rounded-lg pointer-events-none opacity-40 print:inset-3"
+              className="absolute inset-6 border border-dashed rounded-lg pointer-events-none opacity-40 print:inset-4.5"
               style={{ borderColor: theme.accentColor }}
             />
           </>
@@ -147,13 +147,13 @@ const ContractPreview: React.FC<ContractPreviewProps> = ({
 
         {theme.pageBorder === 'single' && (
           <div
-            className="absolute inset-4 border pointer-events-none print:inset-2"
+            className="absolute inset-4 border pointer-events-none print:inset-3"
             style={{ borderColor: theme.accentColor }}
           />
         )}
 
         {/* Content Container */}
-        <div className="relative z-10 flex flex-col justify-between min-h-[1000px] print:min-h-0">
+        <div className="relative z-10 flex flex-col justify-between min-h-[1000px] print:min-h-0 px-2 sm:px-4 print:px-3">
           
           {/* Header & Seal */}
           <div>

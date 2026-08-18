@@ -404,7 +404,7 @@ const ContractStudio: React.FC<ContractStudioProps> = ({
       @media print {
         @page {
           size: letter ${orientation} !important;
-          margin: 12mm 12mm 15mm 12mm !important;
+          margin: 10mm 10mm 12mm 10mm !important;
         }
       }
     `;
